@@ -19,20 +19,24 @@ function toggleTheme() {
 initTheme();
 
 // ── Type Configuration ───────────────────────────────────────────────────────
+const ICON_UI_LIFECYCLE = `<svg class="chip-icon" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg>`;
+const ICON_NETWORK_STATE = `<svg class="chip-icon" viewBox="0 0 24 24" fill="none"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
 const TYPE_CONFIG = {
-  'ui.lifecycle':   { label: 'UI Lifecycle',  chipClass: 'chip-lifecycle', dot: '#8b5cf6', badge: '#8b5cf620', badgeBorder: '#8b5cf640' },
-  'network.request':{ label: 'Network',       chipClass: 'chip-network',   dot: '#10b981', badge: '#10b98120', badgeBorder: '#10b98140' },
-  'user.event':     { label: 'User Event',    chipClass: 'chip-user',      dot: '#f59e0b', badge: '#f59e0b20', badgeBorder: '#f59e0b40' },
-  'app.lifecycle':  { label: 'App Lifecycle', chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
-  'app.launch':     { label: 'App Launch',    chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
-  'app.install':    { label: 'App Install',   chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
-  'network.state':  { label: 'Network State', chipClass: 'chip-state',     dot: '#ec4899', badge: '#ec489920', badgeBorder: '#ec489940' },
-  'system.event':  { label: 'System Event', chipClass: 'chip-state',     dot: '#9f48ec', badge: '#9f48ec20', badgeBorder: '#9f48ec40' },
+  'ui.lifecycle':   { label: 'UI Lifecycle',  icon: ICON_UI_LIFECYCLE, chipClass: 'chip-lifecycle', dot: '#8b5cf6', badge: '#8b5cf620', badgeBorder: '#8b5cf640' },
+  'network.request':{ label: 'Network',       icon: '🌐', chipClass: 'chip-network',   dot: '#10b981', badge: '#10b98120', badgeBorder: '#10b98140' },
+  'user.event':     { label: 'User Event',    icon: '👆', chipClass: 'chip-user',      dot: '#f59e0b', badge: '#f59e0b20', badgeBorder: '#f59e0b40' },
+  'app.lifecycle':  { label: 'App Lifecycle', icon: '🚀', chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
+  'app.launch':     { label: 'App Launch',    icon: '🚀', chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
+  'app.install':    { label: 'App Install',   icon: '📥', chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
+  'network.state':  { label: 'Network State', icon: ICON_NETWORK_STATE, chipClass: 'chip-state',     dot: '#ec4899', badge: '#ec489920', badgeBorder: '#ec489940' },
+  'system.event':  { label: 'System Event', icon: '⚙️', chipClass: 'chip-state',     dot: '#9f48ec', badge: '#9f48ec20', badgeBorder: '#9f48ec40' },
 };
 
 function getConfig(type) {
   return TYPE_CONFIG[type] || {
     label: type,
+    icon: '🔹',
     chipClass: 'chip-nav',
     dot: '#4f8ef7',
     badge: '#4f8ef720',
@@ -419,7 +423,7 @@ function renderTimeline() {
         <div class="bc-row">
           <span class="bc-badge"
             style="background:${cfg.badge};border:1px solid ${cfg.badgeBorder};color:${cfg.dot}">
-            ${cfg.label}
+            ${cfg.icon} ${cfg.label}
           </span>
           <span class="bc-main" title="${buildMainText(bc)}">${buildMainText(bc)}</span>
           <div class="bc-meta">

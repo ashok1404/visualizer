@@ -707,6 +707,17 @@ textarea::placeholder { color: var(--text-muted); }
   border-radius: 4px;
   flex-shrink: 0;
   letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bc-badge .chip-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.9;
+  vertical-align: -2px;
 }
 
 .bc-main {
