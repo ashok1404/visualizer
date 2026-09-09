@@ -78,6 +78,8 @@ const META_LABELS = {
   writesCaused: 'Disk Writes',
   hangDuration: 'Hang Duration',
   launchDuration: 'Launch Duration',
+  exceptionCode: 'Exception Code',
+  exceptionType: 'Exception Sub Type',
 };
 
 // ── Diagnostic Type Mapping (MetricKit-style eTp) ────────────────────────────
@@ -501,10 +503,186 @@ function crashSummaryInnerHTML({ dtype, heading, reason, tags }) {
     <div class="crash-summary-head">
       <span class="crash-summary-icon">${dtype.icon}</span>
       <span class="crash-summary-heading" style="color:${dtype.color}">${escapeHtml(heading)}</span>
+      <button class="btn btn-ghost crash-download-btn" onclick="downloadCrashReport()">⬇ Download Report</button>
     </div>
     ${reason ? `<div class="crash-summary-reason">${escapeHtml(reason)}</div>` : ''}
     <div class="crash-summary-tags">${tags.join('')}</div>
   `;
+}
+
+// ── Crash Report Export ──────────────────────────────────────────────────────
+// combines metadata + message + stack trace into one plain-text file, laid out
+// like the platform's own native crash log — only fields that format actually
+// carries and that this payload actually has, nothing invented, nothing extra.
+function getReportFields() {
+  const platform   = getPlatform(currentSdkId);
+  const dtype      = getDiagnosticType(crashEvent && crashEvent.type);
+  const signal     = crashMetadata ? crashMetadata.signal : null;
+  const signalName = signal != null ? (SIGNAL_NAMES[signal] || `Signal ${signal}`) : null;
+  const reason     = (crashEvent && crashEvent.message) || (crashMetadata && crashMetadata.title) || dtype.label;
+  const version    = crashMetadata && crashMetadata.appVersion
+    ? crashMetadata.appVersion + (crashMetadata.appBuildVersion ? ` (${crashMetadata.appBuildVersion})` : '')
+    : null;
+  const threads      = stackTraceData && stackTraceData.threads ? stackTraceData.threads : [];
+  const crashedThread = threads.find(t => t.crashed) || null;
+
+  return { platform, dtype, signal, signalName, reason, version, threads, crashedThread };
+}
+
+function formatFrames(frames) {
+  if (!frames.length) return '(no frames)';
+  return frames.map(frame => {
+    const { binary, address, symbol } = parseFrameLine(frame.fLine);
+    return `${String(frame.i).padStart(3)}  ${binary.padEnd(30)} ${address}  ${symbol}`;
+  }).join('\n');
+}
+
+// thread.name is often just "Thread <id>" again — only worth printing when it adds information
+function threadLabel(thread) {
+  const fallback = `Thread ${thread.id}`;
+  return thread.name && thread.name !== fallback ? `: ${thread.name}` : '';
+}
+
+// any eMeta field not already surfaced as one of the named header fields —
+// real apps bundle this alongside the crash (region, low power mode, TestFlight, ...)
+function extraMetadataLines(usedKeys) {
+  if (!crashMetadata) return [];
+  return Object.keys(crashMetadata)
+    .filter(key => !usedKeys.has(key) && crashMetadata[key] != null)
+    .map(key => {
+      let value = crashMetadata[key];
+      if (typeof value === 'boolean') value = value ? 'Yes' : 'No';
+      return `${META_LABELS[key] || key}: ${value}`;
+    });
+}
+
+// Apple crash-log style — https://developer.apple.com/documentation/xcode/analyzing-a-crash-report
+function buildIOSCrashText(f) {
+  const lines = [];
+  if (crashMetadata && crashMetadata.deviceType)        lines.push(`Hardware Model:      ${crashMetadata.deviceType}`);
+  if (f.version)                                        lines.push(`Version:             ${f.version}`);
+  if (crashMetadata && crashMetadata.platformArchitecture) lines.push(`Code Type:           ${crashMetadata.platformArchitecture}`);
+  if (crashMetadata && crashMetadata.osVersion)         lines.push(`OS Version:          ${crashMetadata.osVersion}`);
+  lines.push(...extraMetadataLines(new Set(['title', 'appVersion', 'appBuildVersion', 'osVersion', 'deviceType', 'platformArchitecture', 'signal'])));
+  lines.push('');
+  lines.push(`Exception Type:  ${f.signalName || f.dtype.label}`);
+  if (f.reason) lines.push(`Exception Note:  ${f.reason}`);
+  if (f.crashedThread) lines.push(`Triggered by Thread:  ${f.crashedThread.id}`);
+  lines.push('');
+
+  f.threads.forEach(thread => {
+    const label = threadLabel(thread);
+    lines.push(thread.crashed ? `Thread ${thread.id} Crashed${label}` : `Thread ${thread.id}${label}`);
+    lines.push(formatFrames(thread.stack || []));
+    lines.push('');
+  });
+
+  return lines.join('\n').trim();
+}
+
+// Android FATAL EXCEPTION style — matches what logcat prints for an uncaught exception
+function buildAndroidCrashText(f) {
+  const lines = [];
+  const mainName = f.crashedThread ? (f.crashedThread.name || `Thread ${f.crashedThread.id}`) : 'main';
+  lines.push(`FATAL EXCEPTION: ${mainName}`);
+  if (f.version)                                lines.push(`App Version: ${f.version}`);
+  if (crashMetadata && crashMetadata.deviceType) lines.push(`Device: ${crashMetadata.deviceType}`);
+  if (crashMetadata && crashMetadata.osVersion)  lines.push(`OS Version: ${crashMetadata.osVersion}`);
+  lines.push(...extraMetadataLines(new Set(['title', 'appVersion', 'appBuildVersion', 'osVersion', 'deviceType', 'signal'])));
+  lines.push('');
+  lines.push(f.reason || f.dtype.label);
+  if (f.crashedThread) {
+    (f.crashedThread.stack || []).forEach(frame => {
+      lines.push(`\tat ${parseFrameLine(frame.fLine).symbol}`);
+    });
+  }
+
+  const others = f.threads.filter(t => t !== f.crashedThread);
+  if (others.length) {
+    lines.push('');
+    lines.push('--- Other Threads ---');
+    others.forEach(thread => {
+      lines.push('');
+      lines.push(`"${thread.name || 'Thread ' + thread.id}"`);
+      (thread.stack || []).forEach(frame => {
+        lines.push(`\tat ${parseFrameLine(frame.fLine).symbol}`);
+      });
+    });
+  }
+
+  return lines.join('\n').trim();
+}
+
+// React Native unhandled-JS-exception style (redbox stack format)
+function buildReactNativeCrashText(f) {
+  const lines = [];
+  lines.push(`Error: ${f.reason || f.dtype.label}`);
+  lines.push('');
+  if (f.version)                                 lines.push(`App Version: ${f.version}`);
+  if (crashMetadata && crashMetadata.deviceType) lines.push(`Device: ${crashMetadata.deviceType}`);
+  if (crashMetadata && crashMetadata.osVersion)  lines.push(`OS Version: ${crashMetadata.osVersion}`);
+  lines.push(...extraMetadataLines(new Set(['title', 'appVersion', 'appBuildVersion', 'osVersion', 'deviceType', 'signal'])));
+  lines.push('');
+
+  const jsThread = f.crashedThread || f.threads[0];
+  if (jsThread) {
+    (jsThread.stack || []).forEach(frame => {
+      lines.push(`    at ${parseFrameLine(frame.fLine).symbol}`);
+    });
+  }
+
+  return lines.join('\n').trim();
+}
+
+function buildGenericCrashText(f) {
+  const lines = [];
+  lines.push(`Incident Type: ${f.signalName ? `Fatal Exception: ${f.signalName}` : f.dtype.label}`);
+  if (f.version)                                 lines.push(`App Version: ${f.version}`);
+  if (crashMetadata && crashMetadata.deviceType) lines.push(`Device: ${crashMetadata.deviceType}`);
+  if (crashMetadata && crashMetadata.osVersion)  lines.push(`OS Version: ${crashMetadata.osVersion}`);
+  lines.push(...extraMetadataLines(new Set(['title', 'appVersion', 'appBuildVersion', 'osVersion', 'deviceType', 'signal'])));
+  lines.push('');
+  lines.push(f.reason || '(no message)');
+  lines.push('');
+
+  f.threads.forEach(thread => {
+    const label = threadLabel(thread);
+    lines.push(thread.crashed ? `Thread ${thread.id} Crashed${label}` : `Thread ${thread.id}${label}`);
+    lines.push(formatFrames(thread.stack || []));
+    lines.push('');
+  });
+
+  return lines.join('\n').trim();
+}
+
+function buildCrashReportText() {
+  const f = getReportFields();
+  const platformLabel = f.platform ? f.platform.label : 'Unknown';
+
+  let body;
+  switch (platformLabel) {
+    case 'iOS':           body = buildIOSCrashText(f); break;
+    case 'Android':       body = buildAndroidCrashText(f); break;
+    case 'React Native':  body = buildReactNativeCrashText(f); break;
+    default:              body = buildGenericCrashText(f);
+  }
+
+  const header = [`Platform:      ${platformLabel}`];
+  if (crashEvent && crashEvent.time) header.push(`Date/Time:     ${new Date(crashEvent.time).toISOString()}`);
+
+  return header.join('\n') + '\n\n' + body + '\n';
+}
+
+function downloadCrashReport() {
+  const blob = new Blob([buildCrashReportText()], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `crash-report-${Date.now()}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // shared by the Diagnostic tab's crash box (#crashSummary) and the breadcrumb
