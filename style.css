@@ -388,6 +388,13 @@ textarea::placeholder { color: var(--text-muted); }
 .view-tab:hover { color: var(--text); }
 .view-tab.active { background: var(--accent); color: #fff; }
 
+/* ── BREADCRUMB VIEW ── */
+#breadcrumbView {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 /* ── STACK TRACE VIEW ── */
 #stacktraceView {
   display: flex;
@@ -401,8 +408,6 @@ textarea::placeholder { color: var(--text-muted); }
   border-radius: 12px;
   padding: 20px 22px;
 }
-
-#crashSummaryBreadcrumb { margin-bottom: 20px; }
 
 .crash-summary-head {
   display: flex;
