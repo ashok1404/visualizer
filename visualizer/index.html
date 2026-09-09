@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breadcrumb Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">B</div>
+  <div>
+    <h1>Breadcrumb Visualizer</h1>
+    <p>Crash Report Inspector</p>
+  </div>
+  <div class="platform-badge" id="platformBadge"></div>
+</header>
+
+<div class="layout">
+
+  <!-- INPUT -->
+  <div class="input-card">
+    <div class="card-header">
+      <span class="card-title">Paste Error Payload</span>
+    </div>
+    <textarea id="jsonInput" placeholder="Paste your crash report JSON here (breadcrumbs, stack trace, or both)..."></textarea>
+    <div class="input-footer">
+      <span class="error-msg" id="errorMsg"></span>
+      <div style="display:flex; gap:8px; margin-left:auto">
+        <button class="btn btn-ghost" onclick="loadExample()">Load Example</button>
+        <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+        <button class="btn btn-primary" onclick="parseAndRender()">Visualize →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW SWITCH -->
+  <div class="view-switch" id="viewSwitch">
+    <button class="view-tab active" id="tabBreadcrumb" data-view="breadcrumb" onclick="setView('breadcrumb')">🍞 Breadcrumbs</button>
+    <button class="view-tab" id="tabStacktrace" data-view="stacktrace" onclick="setView('stacktrace')">🧵 Diagnostic</button>
+  </div>
+
+  <!-- BREADCRUMB VIEW -->
+  <div id="breadcrumbView">
+
+    <!-- STATS -->
+    <div class="stats" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-label">Total Events</div>
+        <div class="stat-value" id="statTotal">—</div>
+        <div class="stat-sub">breadcrumbs</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Session Duration</div>
+        <div class="stat-value" id="statDuration">—</div>
+        <div class="stat-sub">from first to crash</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Screens Visited</div>
+        <div class="stat-value" id="statScreens">—</div>
+        <div class="stat-sub">unique activities</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Network Calls</div>
+        <div class="stat-value" id="statNetwork">—</div>
+        <div class="stat-sub">http requests</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">User Actions</div>
+        <div class="stat-value" id="statUser">—</div>
+        <div class="stat-sub">taps &amp; gestures</div>
+      </div>
+    </div>
+
+    <!-- FILTER CONTROLS -->
+    <div class="controls" id="controls">
+      <div class="controls-left" id="filterChips"></div>
+      <div class="controls-right">
+        <span class="sort-label">Sort:</span>
+        <button class="sort-btn active" id="sortAsc" onclick="setSort('asc')">
+          <span>Oldest first</span><span class="sort-arrow">↑</span>
+        </button>
+        <button class="sort-btn" id="sortDesc" onclick="setSort('desc')">
+          <span>Newest first</span><span class="sort-arrow">↓</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div class="timeline-wrap" id="timelineWrap">
+      <div class="timeline-header">
+        <span class="timeline-title">Event Timeline</span>
+        <span class="result-count" id="resultCount"></span>
+      </div>
+      <div class="timeline" id="timeline"></div>
+      <div class="empty-state" id="emptyState">
+        <div class="empty-state-icon">🔍</div>
+        <h3>No events match</h3>
+        <p>Try enabling more filter types above.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- STACK TRACE VIEW -->
+  <div id="stacktraceView" style="display:none">
+    <div class="crash-summary" id="crashSummary"></div>
+    <div class="meta-grid" id="metaGrid"></div>
+    <div class="threads-wrap" id="threadsWrap">
+      <div class="timeline-header">
+        <span class="timeline-title">Threads</span>
+        <span class="result-count" id="threadCount"></span>
+      </div>
+      <div id="threadsList"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
