@@ -1,13 +1,13 @@
 :root {
-  --bg: #0a0b0e;
-  --surface: #111318;
-  --surface2: #181b22;
-  --border: #1f2330;
-  --border2: #2a2f3e;
-  --text: #e8eaf0;
-  --text-muted: #6b7280;
-  --text-dim: #9ca3af;
-  --accent: #4f8ef7;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface2: #eef0f4;
+  --border: #e3e6ec;
+  --border2: #d3d7e0;
+  --text: #14161c;
+  --text-muted: #74798a;
+  --text-dim: #4b5063;
+  --accent: #3b6fe0;
 
   --c-nav: #4f8ef7;
   --c-nav-bg: rgba(79, 142, 247, 0.1);
@@ -36,6 +36,18 @@
   --c-state: #ec4899;
   --c-state-bg: rgba(236, 72, 153, 0.1);
   --c-state-border: rgba(236, 72, 153, 0.3);
+}
+
+[data-theme="dark"] {
+  --bg: #0a0b0e;
+  --surface: #111318;
+  --surface2: #181b22;
+  --border: #1f2330;
+  --border2: #2a2f3e;
+  --text: #e8eaf0;
+  --text-muted: #6b7280;
+  --text-dim: #9ca3af;
+  --accent: #4f8ef7;
 }
 
 *,
@@ -97,6 +109,23 @@ header p {
   color: var(--text-muted);
   font-family: 'JetBrains Mono', monospace;
 }
+
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.theme-toggle:hover { border-color: var(--text-muted); transform: translateY(-1px); }
+.theme-toggle:active { transform: translateY(0); }
 
 /* ── PLATFORM BADGE ── */
 .platform-badge {
@@ -383,10 +412,11 @@ textarea::placeholder { color: var(--text-muted); }
 .crash-summary-icon { font-size: 15px; }
 
 .crash-summary-heading {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--c-error);
-  letter-spacing: -0.2px;
+  letter-spacing: normal;
 }
 
 .crash-summary-reason {

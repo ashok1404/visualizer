@@ -1,3 +1,23 @@
+// ── Theme (light by default, toggle persists via localStorage) ─────────────────
+function initTheme() {
+  let stored = null;
+  try { stored = localStorage.getItem('theme'); } catch (e) { /* storage unavailable */ }
+  applyTheme(stored === 'dark' ? 'dark' : 'light');
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeIcon').textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  try { localStorage.setItem('theme', next); } catch (e) { /* storage unavailable */ }
+}
+
+initTheme();
+
 // ── Type Configuration ───────────────────────────────────────────────────────
 const TYPE_CONFIG = {
   'ui.lifecycle':   { label: 'UI Lifecycle',  chipClass: 'chip-lifecycle', dot: '#8b5cf6', badge: '#8b5cf620', badgeBorder: '#8b5cf640' },
@@ -381,6 +401,38 @@ function renderTimeline() {
     sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp
   );
 
+  // crash card always leads the timeline — it's the reason you're looking, regardless of sort order
+  if (crashEvent) {
+    const crashEl = document.createElement('div');
+    crashEl.className = 'bc-item is-crash';
+    crashEl.innerHTML = `
+      <div class="bc-dot-wrap">
+        <div class="bc-dot" style="background:#ef4444"></div>
+      </div>
+      <div class="bc-content"
+        style="border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.07)">
+        <div class="bc-row">
+          <span class="bc-badge"
+            style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444">
+            💥 CRASH
+          </span>
+          <span class="bc-main" style="color:#ef4444" title="${crashEvent.message}">
+            ${crashEvent.message}
+          </span>
+          <div class="bc-meta">
+            ${crashEvent.time
+              ? `<span class="bc-time">${formatTime(crashEvent.time)}</span>`
+              : ''}
+          </div>
+        </div>
+        <div class="bc-detail" style="color:#ef4444aa">
+          <span><strong style="color:#ef4444bb">type</strong> ${crashEvent.type}</span>
+        </div>
+      </div>
+    `;
+    container.appendChild(crashEl);
+  }
+
   sorted.forEach((bc, idx) => {
     const cfg   = getConfig(bc.type);
     const delta = idx > 0 ? Math.abs(bc.timestamp - sorted[idx - 1].timestamp) : 0;
@@ -413,39 +465,6 @@ function renderTimeline() {
 
     container.appendChild(item);
   });
-
-  // append crash card as the final item
-  if (crashEvent) {
-    const crashEl = document.createElement('div');
-    crashEl.className = 'bc-item is-crash';
-    crashEl.style.animationDelay = `${Math.min(sorted.length * 12, 300)}ms`;
-    crashEl.innerHTML = `
-      <div class="bc-dot-wrap">
-        <div class="bc-dot" style="background:#ef4444"></div>
-      </div>
-      <div class="bc-content"
-        style="border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.07)">
-        <div class="bc-row">
-          <span class="bc-badge"
-            style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444">
-            💥 CRASH
-          </span>
-          <span class="bc-main" style="color:#ef4444" title="${crashEvent.message}">
-            ${crashEvent.message}
-          </span>
-          <div class="bc-meta">
-            ${crashEvent.time
-              ? `<span class="bc-time">${formatTime(crashEvent.time)}</span>`
-              : ''}
-          </div>
-        </div>
-        <div class="bc-detail" style="color:#ef4444aa">
-          <span><strong style="color:#ef4444bb">type</strong> ${crashEvent.type}</span>
-        </div>
-      </div>
-    `;
-    container.appendChild(crashEl);
-  }
 
   applyFilters();
 }
