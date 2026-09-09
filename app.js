@@ -47,7 +47,7 @@ const DEFAULT_PAYLOAD = [{"col":1,"time":1788952320000,"eCnt":1,"VER":"3.15.14",
 let allBreadcrumbs = [];
 
 let activeFilters  = new Set();
-let sortOrder      = 'asc';
+let sortOrder      = 'desc';
 let crashEvent     = null;
 let stackTraceData = null;
 let crashMetadata  = null;
