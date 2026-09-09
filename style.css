@@ -757,12 +757,6 @@ textarea::placeholder { color: var(--text-muted); }
 .status-err  { color: var(--c-error); }
 .status-warn { color: var(--c-user); }
 
-/* crash item highlight */
-.bc-item.is-crash .bc-content {
-  border-color: var(--c-error-border);
-  background: var(--c-error-bg);
-}
-
 /* ── EMPTY STATE ── */
 .empty-state {
   text-align: center;

@@ -401,33 +401,19 @@ function renderTimeline() {
     sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp
   );
 
-  // crash card always leads the timeline — it's the reason you're looking, regardless of sort order
-  if (crashEvent) {
+  // crash card always leads the timeline — it's the reason you're looking, regardless of sort
+  // order — and it's styled identically to the Diagnostic tab's crash box
+  const crashData = getCrashSummaryData();
+  if (crashData) {
     const crashEl = document.createElement('div');
     crashEl.className = 'bc-item is-crash';
     crashEl.innerHTML = `
       <div class="bc-dot-wrap">
-        <div class="bc-dot" style="background:#ef4444"></div>
+        <div class="bc-dot" style="background:${crashData.dtype.color}"></div>
       </div>
-      <div class="bc-content"
-        style="border-color:rgba(239,68,68,0.3);background:rgba(239,68,68,0.07)">
-        <div class="bc-row">
-          <span class="bc-badge"
-            style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444">
-            💥 CRASH
-          </span>
-          <span class="bc-main" style="color:#ef4444" title="${crashEvent.message}">
-            ${crashEvent.message}
-          </span>
-          <div class="bc-meta">
-            ${crashEvent.time
-              ? `<span class="bc-time">${formatTime(crashEvent.time)}</span>`
-              : ''}
-          </div>
-        </div>
-        <div class="bc-detail" style="color:#ef4444aa">
-          <span><strong style="color:#ef4444bb">type</strong> ${crashEvent.type}</span>
-        </div>
+      <div class="crash-summary"
+        style="margin:6px 0;background:${crashData.dtype.color}14;border-color:${crashData.dtype.color}4d">
+        ${crashSummaryInnerHTML(crashData)}
       </div>
     `;
     container.appendChild(crashEl);
@@ -490,9 +476,10 @@ function renderStackTrace() {
   renderThreads();
 }
 
-function renderCrashSummary() {
-  const el = document.getElementById('crashSummary');
-  if (!crashMetadata && !crashEvent) { el.innerHTML = ''; el.removeAttribute('style'); return; }
+// shared by the Diagnostic tab's crash box and the breadcrumb timeline's crash card
+// so the two render identically
+function getCrashSummaryData() {
+  if (!crashMetadata && !crashEvent) return null;
 
   const dtype       = getDiagnosticType(crashEvent && crashEvent.type);
   const isCrash      = dtype.key === 'crash';
@@ -520,10 +507,11 @@ function renderCrashSummary() {
     tags.push(`<span class="tag">crashed on <strong>${escapeHtml(crashedThread.name || 'Thread ' + crashedThread.id)}</strong></span>`);
   }
 
-  el.style.background  = `${dtype.color}14`;
-  el.style.borderColor = `${dtype.color}4d`;
+  return { dtype, heading, reason, tags };
+}
 
-  el.innerHTML = `
+function crashSummaryInnerHTML({ dtype, heading, reason, tags }) {
+  return `
     <div class="crash-summary-head">
       <span class="crash-summary-icon">${dtype.icon}</span>
       <span class="crash-summary-heading" style="color:${dtype.color}">${escapeHtml(heading)}</span>
@@ -531,6 +519,16 @@ function renderCrashSummary() {
     ${reason ? `<div class="crash-summary-reason">${escapeHtml(reason)}</div>` : ''}
     <div class="crash-summary-tags">${tags.join('')}</div>
   `;
+}
+
+function renderCrashSummary() {
+  const el = document.getElementById('crashSummary');
+  const data = getCrashSummaryData();
+  if (!data) { el.innerHTML = ''; el.removeAttribute('style'); return; }
+
+  el.style.background  = `${data.dtype.color}14`;
+  el.style.borderColor = `${data.dtype.color}4d`;
+  el.innerHTML = crashSummaryInnerHTML(data);
 }
 
 function renderPlatformBadge() {
