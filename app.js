@@ -401,24 +401,6 @@ function renderTimeline() {
     sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp
   );
 
-  // crash card always leads the timeline — it's the reason you're looking, regardless of sort
-  // order — and it's styled identically to the Diagnostic tab's crash box
-  const crashData = getCrashSummaryData();
-  if (crashData) {
-    const crashEl = document.createElement('div');
-    crashEl.className = 'bc-item is-crash';
-    crashEl.innerHTML = `
-      <div class="bc-dot-wrap">
-        <div class="bc-dot" style="background:${crashData.dtype.color}"></div>
-      </div>
-      <div class="crash-summary"
-        style="margin:6px 0;background:${crashData.dtype.color}14;border-color:${crashData.dtype.color}4d">
-        ${crashSummaryInnerHTML(crashData)}
-      </div>
-    `;
-    container.appendChild(crashEl);
-  }
-
   sorted.forEach((bc, idx) => {
     const cfg   = getConfig(bc.type);
     const delta = idx > 0 ? Math.abs(bc.timestamp - sorted[idx - 1].timestamp) : 0;
@@ -521,11 +503,14 @@ function crashSummaryInnerHTML({ dtype, heading, reason, tags }) {
   `;
 }
 
-function renderCrashSummary() {
-  const el = document.getElementById('crashSummary');
+// shared by the Diagnostic tab's crash box (#crashSummary) and the breadcrumb
+// timeline's crash box (#crashSummaryBreadcrumb) so the two render identically
+function renderCrashSummary(elId = 'crashSummary') {
+  const el = document.getElementById(elId);
   const data = getCrashSummaryData();
-  if (!data) { el.innerHTML = ''; el.removeAttribute('style'); return; }
+  if (!data) { el.innerHTML = ''; el.removeAttribute('style'); el.style.display = 'none'; return; }
 
+  el.style.display     = '';
   el.style.background  = `${data.dtype.color}14`;
   el.style.borderColor = `${data.dtype.color}4d`;
   el.innerHTML = crashSummaryInnerHTML(data);
@@ -684,6 +669,7 @@ function parseAndRender() {
 
     if (hasBreadcrumbs) {
       activeFilters = new Set(breadcrumbs.map(b => b.type));
+      renderCrashSummary('crashSummaryBreadcrumb');
       renderStats();
       renderFilterChips();
       renderTimeline();

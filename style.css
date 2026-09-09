@@ -402,6 +402,8 @@ textarea::placeholder { color: var(--text-muted); }
   padding: 20px 22px;
 }
 
+#crashSummaryBreadcrumb { margin-bottom: 20px; }
+
 .crash-summary-head {
   display: flex;
   align-items: center;
@@ -620,7 +622,7 @@ textarea::placeholder { color: var(--text-muted); }
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 10px;
 }
 
 /* vertical line */
@@ -661,7 +663,7 @@ textarea::placeholder { color: var(--text-muted); }
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding-top: 14px;
+  padding-top: 8px;
   flex-shrink: 0;
   position: relative;
   z-index: 1;
@@ -679,7 +681,6 @@ textarea::placeholder { color: var(--text-muted); }
   flex: 1;
   border: 1px solid var(--border);
   border-radius: 10px;
-  margin: 6px 0;
   overflow: hidden;
   transition: border-color 0.15s;
 }
