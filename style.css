@@ -552,6 +552,10 @@ textarea::placeholder { color: var(--text-muted); }
   color: var(--text-dim);
 }
 
+.frame-row.frame-row-compact {
+  grid-template-columns: 22px 1fr;
+}
+
 .frame-index { color: var(--text-muted); text-align: right; }
 .frame-binary { color: var(--text); font-weight: 600; overflow-wrap: break-word; }
 .frame-address { color: var(--text-muted); overflow-wrap: break-word; }

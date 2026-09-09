@@ -259,11 +259,15 @@ function parseEMetaString(raw) {
   return obj;
 }
 
-// splits a symbolicated frame line into binary / address / symbol columns
+// splits a symbolicated frame line into binary / address / symbol columns.
+// native (iOS) frames look like "Binary  0xADDRESS  Symbol + offset"; Android/RN
+// frames instead look like "at Class.method(File.kt:51)" — no binary/address at
+// all, so strip the redundant leading "at" and leave binary/address blank.
 function parseFrameLine(fLine) {
-  const m = String(fLine || '').match(/^(\S+)\s+(0x[0-9a-fA-F]+)\s+(.+)$/);
-  if (!m) return { binary: '', address: '', symbol: fLine || '' };
-  return { binary: m[1], address: m[2], symbol: m[3] };
+  const raw = String(fLine || '');
+  const m = raw.match(/^(\S+)\s+(0x[0-9a-fA-F]+)\s+(.+)$/);
+  if (m) return { binary: m[1], address: m[2], symbol: m[3] };
+  return { binary: '', address: '', symbol: raw.replace(/^at\s+/, '') };
 }
 
 function parsePayload(raw) {
@@ -741,6 +745,18 @@ function renderMetaGrid() {
 
 function renderFrameRow(frame) {
   const { binary, address, symbol } = parseFrameLine(frame.fLine);
+
+  // no binary/address to show (Android/RN-style frames) — skip those columns
+  // instead of leaving them empty, which would leave a big gap before the symbol
+  if (!binary && !address) {
+    return `
+      <div class="frame-row frame-row-compact">
+        <span class="frame-index">${frame.i}</span>
+        <span class="frame-symbol">${escapeHtml(symbol)}</span>
+      </div>
+    `;
+  }
+
   return `
     <div class="frame-row">
       <span class="frame-index">${frame.i}</span>
