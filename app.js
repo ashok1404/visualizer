@@ -263,12 +263,12 @@ function parseEMetaString(raw) {
 // splits a symbolicated frame line into binary / address / symbol columns.
 // native (iOS) frames look like "Binary  0xADDRESS  Symbol + offset"; Android/RN
 // frames instead look like "at Class.method(File.kt:51)" — no binary/address at
-// all, so strip the redundant leading "at" and leave binary/address blank.
+// all, so leave binary/address blank and keep fLine exactly as given.
 function parseFrameLine(fLine) {
   const raw = String(fLine || '');
   const m = raw.match(/^(\S+)\s+(0x[0-9a-fA-F]+)\s+(.+)$/);
   if (m) return { binary: m[1], address: m[2], symbol: m[3] };
-  return { binary: '', address: '', symbol: raw.replace(/^at\s+/, '') };
+  return { binary: '', address: '', symbol: raw };
 }
 
 function parsePayload(raw) {
@@ -598,7 +598,7 @@ function buildAndroidCrashText(f) {
   lines.push(f.reason || f.dtype.label);
   if (f.crashedThread) {
     (f.crashedThread.stack || []).forEach(frame => {
-      lines.push(`\tat ${parseFrameLine(frame.fLine).symbol}`);
+      lines.push(`\t${parseFrameLine(frame.fLine).symbol}`);
     });
   }
 
@@ -610,7 +610,7 @@ function buildAndroidCrashText(f) {
       lines.push('');
       lines.push(`"${thread.name || 'Thread ' + thread.id}"`);
       (thread.stack || []).forEach(frame => {
-        lines.push(`\tat ${parseFrameLine(frame.fLine).symbol}`);
+        lines.push(`\t${parseFrameLine(frame.fLine).symbol}`);
       });
     });
   }
@@ -632,7 +632,7 @@ function buildReactNativeCrashText(f) {
   const jsThread = f.crashedThread || f.threads[0];
   if (jsThread) {
     (jsThread.stack || []).forEach(frame => {
-      lines.push(`    at ${parseFrameLine(frame.fLine).symbol}`);
+      lines.push(`    ${parseFrameLine(frame.fLine).symbol}`);
     });
   }
 
@@ -909,7 +909,13 @@ function parseAndRender() {
       renderStackTrace();
     }
 
-    setView(hasBreadcrumbs ? 'breadcrumb' : 'stacktrace');
+    // stay on whichever tab is currently open if the new payload still has
+    // data for it, instead of always jumping back to Breadcrumbs
+    const targetView =
+      currentView === 'stacktrace' && (hasStackTrace || hasMetadata) ? 'stacktrace' :
+      currentView === 'breadcrumb' && hasBreadcrumbs                 ? 'breadcrumb' :
+      hasBreadcrumbs                                                 ? 'breadcrumb' : 'stacktrace';
+    setView(targetView);
 
   } catch (e) {
     showError('Invalid JSON: ' + e.message);
