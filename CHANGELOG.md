@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-10
+- Re-visualizing a payload now stays on the current tab instead of jumping back to Breadcrumbs; buttons, chips, and tabs got a visible pressed state; frame text is shown exactly as given (no more stripped "at" prefix); added document.md field reference for the crash JSON.
 - Added a Detailed/Plain Text toggle to the Threads section, letting you preview the stack trace as plain text without downloading.
 
 ## 2026-09-09
