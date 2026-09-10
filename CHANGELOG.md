@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-10
+- Added a Detailed/Plain Text toggle to the Threads section, letting you preview the stack trace as plain text without downloading.
+
 ## 2026-09-09
 - Fixed Android/React Native stack frames showing a large gap after the frame index, and a duplicated "at at" in the downloaded report.
 - Added a Download Report button that exports the crash as a .txt file formatted to match the detected platform's native crash log (iOS, Android, or React Native).
