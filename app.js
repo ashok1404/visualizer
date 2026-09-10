@@ -57,6 +57,7 @@ let stackTraceData = null;
 let crashMetadata  = null;
 let currentView    = 'breadcrumb';
 let currentSdkId   = null;
+let threadViewMode = 'cell'; // 'cell' (default thread cards) or 'text' (raw stack trace preview)
 
 const SIGNAL_NAMES = {
   1: 'SIGHUP', 2: 'SIGINT', 3: 'SIGQUIT', 4: 'SIGILL', 5: 'SIGTRAP',
@@ -767,6 +768,29 @@ function renderFrameRow(frame) {
   `;
 }
 
+// same thread/frame data as the "Cell View" cards below, laid out as plain text
+function buildThreadsText() {
+  const threads = stackTraceData && stackTraceData.threads ? stackTraceData.threads : [];
+  return threads.map(thread => {
+    const label  = threadLabel(thread);
+    const header = thread.crashed ? `Thread ${thread.id} Crashed${label}` : `Thread ${thread.id}${label}`;
+    return `${header}\n${formatFrames(thread.stack || [])}`;
+  }).join('\n\n');
+}
+
+function setThreadViewMode(mode) {
+  threadViewMode = mode;
+  applyThreadViewMode();
+}
+
+function applyThreadViewMode() {
+  const isCell = threadViewMode === 'cell';
+  document.getElementById('threadsList').style.display     = isCell ? '' : 'none';
+  document.getElementById('threadsTextView').style.display = isCell ? 'none' : '';
+  document.getElementById('threadViewBtnCell').classList.toggle('active', isCell);
+  document.getElementById('threadViewBtnText').classList.toggle('active', !isCell);
+}
+
 function renderThreads() {
   const container = document.getElementById('threadsList');
   const wrap      = document.getElementById('threadsWrap');
@@ -774,6 +798,8 @@ function renderThreads() {
 
   const threads = stackTraceData && stackTraceData.threads ? stackTraceData.threads : [];
   wrap.style.display = threads.length ? '' : 'none';
+  document.getElementById('stackViewToggle').style.display = threads.length ? '' : 'none';
+  document.getElementById('threadsTextView').textContent   = buildThreadsText();
   document.getElementById('threadCount').textContent = threads.length ? `${threads.length} threads` : '';
 
   threads.forEach(thread => {
@@ -810,6 +836,8 @@ function renderThreads() {
     card.appendChild(framesEl);
     container.appendChild(card);
   });
+
+  applyThreadViewMode();
 }
 
 // ── Filter Application ────────────────────────────────────────────────────────

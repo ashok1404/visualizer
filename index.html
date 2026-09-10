@@ -116,10 +116,17 @@
     <div class="meta-grid" id="metaGrid"></div>
     <div class="threads-wrap" id="threadsWrap">
       <div class="timeline-header">
-        <span class="timeline-title">Threads</span>
-        <span class="result-count" id="threadCount"></span>
+        <div class="timeline-header-left">
+          <span class="timeline-title">Threads</span>
+          <span class="result-count" id="threadCount"></span>
+        </div>
+        <div class="crash-view-toggle" id="stackViewToggle" style="display:none">
+          <button class="crash-view-btn active" id="threadViewBtnCell" onclick="setThreadViewMode('cell')">🔍 Detailed</button>
+          <button class="crash-view-btn" id="threadViewBtnText" onclick="setThreadViewMode('text')">📄 Plain Text</button>
+        </div>
       </div>
       <div id="threadsList"></div>
+      <pre class="crash-raw-text" id="threadsTextView" style="display:none"></pre>
     </div>
   </div>
 
