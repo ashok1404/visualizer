@@ -40,80 +40,112 @@
     </div>
   </div>
 
-  <!-- VIEW SWITCH -->
-  <div class="view-switch" id="viewSwitch">
-    <button class="view-tab active" id="tabBreadcrumb" data-view="breadcrumb" onclick="setView('breadcrumb')">🍞 Breadcrumbs</button>
-    <button class="view-tab" id="tabStacktrace" data-view="stacktrace" onclick="setView('stacktrace')">🧵 Diagnostic</button>
+  <!-- FILTER TOOLBAR (Error Explorer style) -->
+  <div class="filter-toolbar" id="filterToolbar">
+    <button class="toolbar-marker-btn">Toggle Global Markers <span class="toolbar-caret">▾</span></button>
+    <span class="toolbar-native-badge">Native</span>
+    <div class="toolbar-field">
+      <span class="toolbar-label">Data Originated From:</span>
+      <span class="toolbar-value">Native App <span class="toolbar-caret">▾</span></span>
+    </div>
+    <div class="toolbar-field">
+      <span class="toolbar-label">Time Period:</span>
+      <input type="date" class="toolbar-date-input" id="filterDate">
+    </div>
+    <div class="toolbar-field">
+      <span class="toolbar-label">Device:</span>
+      <select class="toolbar-select" id="filterDevice">
+        <option>All</option>
+        <option>Mobile</option>
+      </select>
+    </div>
+    <div class="toolbar-field">
+      <span class="toolbar-label">OS:</span>
+      <select class="toolbar-select" id="filterOS">
+        <option>All OS</option>
+        <option>iOS</option>
+        <option>Android</option>
+        <option>React Native</option>
+      </select>
+    </div>
   </div>
 
-  <!-- BREADCRUMB VIEW -->
-  <div id="breadcrumbView">
+  <!-- CRASH VIEW (single, unified — Event Timeline / Threads live only in the Report modal) -->
+  <div id="crashView">
 
-    <div class="crash-summary" id="crashSummaryBreadcrumb" style="display:none"></div>
-
-    <!-- STATS -->
-    <div class="stats" id="statsRow">
-      <div class="stat-card">
-        <div class="stat-label">Total Events</div>
-        <div class="stat-value" id="statTotal">—</div>
-        <div class="stat-sub">breadcrumbs</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Session Duration</div>
-        <div class="stat-value" id="statDuration">—</div>
-        <div class="stat-sub">from first to crash</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Screens Visited</div>
-        <div class="stat-value" id="statScreens">—</div>
-        <div class="stat-sub">unique activities</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Network Calls</div>
-        <div class="stat-value" id="statNetwork">—</div>
-        <div class="stat-sub">http requests</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">User Actions</div>
-        <div class="stat-value" id="statUser">—</div>
-        <div class="stat-sub">taps &amp; gestures</div>
-      </div>
-    </div>
-
-    <!-- FILTER CONTROLS -->
-    <div class="controls" id="controls">
-      <div class="controls-left" id="filterChips"></div>
-      <div class="controls-right">
-        <span class="sort-label">Sort:</span>
-        <button class="sort-btn" id="sortAsc" onclick="setSort('asc')">
-          <span>Oldest first</span><span class="sort-arrow">↑</span>
-        </button>
-        <button class="sort-btn active" id="sortDesc" onclick="setSort('desc')">
-          <span>Newest first</span><span class="sort-arrow">↓</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- TIMELINE -->
-    <div class="timeline-wrap" id="timelineWrap">
-      <div class="timeline-header">
-        <span class="timeline-title">Event Timeline</span>
-        <span class="result-count" id="resultCount"></span>
-      </div>
-      <div class="timeline" id="timeline"></div>
-      <div class="empty-state" id="emptyState">
-        <div class="empty-state-icon">🔍</div>
-        <h3>No events match</h3>
-        <p>Try enabling more filter types above.</p>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- STACK TRACE VIEW -->
-  <div id="stacktraceView" style="display:none">
     <div class="crash-summary" id="crashSummary"></div>
-    <div class="meta-grid" id="metaGrid"></div>
+    <div class="crash-drilldown-grid" id="crashDrilldownGrid" style="display:none">
+      <div class="crash-info-panel">
+        <div class="meta-grid" id="metaGrid"></div>
+      </div>
+      <div class="crash-charts-grid" id="crashCharts"></div>
+    </div>
+
+    <div class="crash-log-wrap" id="crashLogWrap" style="display:none">
+      <div class="crash-log-toolbar">
+        <div class="crash-log-pager">
+          <button class="pager-btn" disabled>|◀</button>
+          <button class="pager-btn" disabled>◀</button>
+          <span class="pager-info" id="crashLogPagerInfo">1 to 1 (1)</span>
+          <button class="pager-btn" disabled>▶</button>
+          <button class="pager-btn" disabled>▶|</button>
+          <select class="crash-log-pagesize" disabled><option>10 / page</option></select>
+        </div>
+        <input class="crash-log-search" type="text" placeholder="Search..." disabled>
+      </div>
+      <div class="crash-log-table-wrap">
+        <table class="crash-log-table">
+          <thead>
+            <tr>
+              <th>Error Time</th>
+              <th>Session</th>
+              <th>Report</th>
+              <th>Page Name</th>
+              <th>Error Type</th>
+              <th>Number of Errors</th>
+            </tr>
+          </thead>
+          <tbody id="crashLogBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- hidden home for breadcrumb content (stats/filters/timeline) and Threads
+       — all part of the breadcrumb feature, only ever shown reparented into
+       the Report modal -->
+  <div id="modalContentHome" style="display:none">
+    <div id="breadcrumbGroup">
+      <!-- FILTER CONTROLS -->
+      <div class="controls" id="controls">
+        <div class="controls-left" id="filterChips"></div>
+        <div class="controls-right">
+          <span class="sort-label">Sort:</span>
+          <button class="sort-btn" id="sortAsc" onclick="setSort('asc')">
+            <span>Oldest first</span><span class="sort-arrow">↑</span>
+          </button>
+          <button class="sort-btn active" id="sortDesc" onclick="setSort('desc')">
+            <span>Newest first</span><span class="sort-arrow">↓</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div class="timeline-wrap" id="timelineWrap">
+        <div class="timeline-header">
+          <span class="timeline-title">Event Timeline</span>
+          <span class="result-count" id="resultCount"></span>
+        </div>
+        <div class="timeline" id="timeline"></div>
+        <div class="empty-state" id="emptyState">
+          <div class="empty-state-icon">🔍</div>
+          <h3>No events match</h3>
+          <p>Try enabling more filter types above.</p>
+        </div>
+      </div>
+    </div>
+
     <div class="threads-wrap" id="threadsWrap">
       <div class="timeline-header">
         <div class="timeline-header-left">
@@ -121,8 +153,8 @@
           <span class="result-count" id="threadCount"></span>
         </div>
         <div class="crash-view-toggle" id="stackViewToggle" style="display:none">
-          <button class="crash-view-btn active" id="threadViewBtnCell" onclick="setThreadViewMode('cell')">🔍 Detailed</button>
-          <button class="crash-view-btn" id="threadViewBtnText" onclick="setThreadViewMode('text')">📄 Plain Text</button>
+          <button class="crash-view-btn" id="threadViewBtnCell" onclick="setThreadViewMode('cell')">🔍 Detailed</button>
+          <button class="crash-view-btn active" id="threadViewBtnText" onclick="setThreadViewMode('text')">📄 Plain Text</button>
         </div>
       </div>
       <div id="threadsList"></div>
@@ -130,6 +162,27 @@
     </div>
   </div>
 
+</div>
+
+<!-- REPORT MODAL -->
+<div class="modal-overlay" id="reportModal" style="display:none" onclick="if(event.target===this) closeReportModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Crash Report</span>
+      <div class="modal-header-actions">
+        <button class="btn btn-ghost crash-download-btn" id="modalDownloadBtn" onclick="downloadModalReport()">⬇ Download Diagnostic Report</button>
+        <button class="modal-close" onclick="closeReportModal()" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="view-switch visible" id="modalViewSwitch">
+        <button class="view-tab active" id="modalTabStacktrace" onclick="setModalView('stacktrace')">🧵 Diagnostic</button>
+        <button class="view-tab" id="modalTabBreadcrumb" onclick="setModalView('breadcrumb')">🍞 Breadcrumbs</button>
+      </div>
+      <div id="modalTimelineSlot"></div>
+      <div id="modalThreadsSlot" style="display:none"></div>
+    </div>
+  </div>
 </div>
 
 <script src="app.js"></script>

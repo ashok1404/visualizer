@@ -55,9 +55,10 @@ let sortOrder      = 'desc';
 let crashEvent     = null;
 let stackTraceData = null;
 let crashMetadata  = null;
-let currentView    = 'breadcrumb';
+let currentView    = 'stacktrace';
 let currentSdkId   = null;
-let threadViewMode = 'cell'; // 'cell' (default thread cards) or 'text' (raw stack trace preview)
+let nativeAppInfo  = null; // appVersion/sdkVersion/deviceModel — straight from NATIVEAPP, not eMeta
+let threadViewMode = 'text'; // 'cell' (thread cards) or 'text' (raw stack trace preview, default)
 
 const SIGNAL_NAMES = {
   1: 'SIGHUP', 2: 'SIGINT', 3: 'SIGQUIT', 4: 'SIGILL', 5: 'SIGTRAP',
@@ -81,6 +82,7 @@ const META_LABELS = {
   launchDuration: 'Launch Duration',
   exceptionCode: 'Exception Code',
   exceptionType: 'Exception Sub Type',
+  source: 'Source',
 };
 
 // ── Diagnostic Type Mapping (MetricKit-style eTp) ────────────────────────────
@@ -140,17 +142,23 @@ function formatTime(ts) {
   return hms + '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
 
+// "2026-09-08 18:51 IST (+5:30)" style — local date/time plus the browser's UTC offset
+function formatFullDateTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const offMin = -d.getTimezoneOffset();
+  const sign = offMin >= 0 ? '+' : '-';
+  const offH = Math.floor(Math.abs(offMin) / 60);
+  const offM = pad(Math.abs(offMin) % 60);
+  return `${date} ${time} (${sign}${offH}:${offM})`;
+}
+
 function formatDelta(ms) {
   if (ms < 1000) return `+${ms}ms`;
   return `+${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatDuration(ms) {
-  if (ms < 1000) return ms + 'ms';
-  if (ms < 60000) return (ms / 1000).toFixed(1) + 's';
-  const m = Math.floor(ms / 60000);
-  const s = ((ms % 60000) / 1000).toFixed(0);
-  return `${m}m ${s}s`;
 }
 
 function getStatusClass(code) {
@@ -314,17 +322,34 @@ function parsePayload(raw) {
   // (btt-swift-sdk → iOS, btt-android-sdk → Android, react-native-btt-sdk → RN)
   const sdkId = nativeApp.sdkId || null;
 
+  // straight from NATIVEAPP, not eMeta — eMeta can carry its own appVersion
+  // (and no deviceModel/sdkVersion at all), so these are kept separate
+  const nativeAppInfo = {
+    appVersion:  nativeApp.appVersion  || null,
+    sdkVersion:  nativeApp.sdkVersion  || null,
+    deviceModel: nativeApp.deviceModel || null,
+  };
+
+  // session id shows up under a few different names depending on SDK/version —
+  // try the real field first, fall back to "col" (the only other per-session
+  // identifier a payload carries) rather than leaving it blank
+  const sessionId = parsed.sessionId || parsed.sessionID || parsed.sid
+    || nativeApp.sessionId || nativeApp.sessionID || nativeApp.sid
+    || (parsed.col != null ? parsed.col : null);
+
   // extract diagnostic event info — eTp decides the kind (crash, hang, slow
   // launch, excess CPU, heavy disk write, memory warning, ...); msg may be absent
   if (parsed.msg || parsed.eTp) {
     crash = {
-      message: parsed.msg ? parsed.msg.split('~~')[0] : null,
-      type:    parsed.eTp || 'Diagnostic Event',
-      time:    parseInt(parsed.time, 10) || null,
+      message:    parsed.msg ? parsed.msg.replace(/~~/g, '\n') : null,
+      type:       parsed.eTp || 'Diagnostic Event',
+      time:       parseInt(parsed.time, 10) || null,
+      session:    sessionId != null ? String(sessionId) : null,
+      errorCount: parsed.eCnt != null ? parseInt(parsed.eCnt, 10) : null,
     };
   }
 
-  return { breadcrumbs: bcs, crash, stackTrace, metadata, sdkId };
+  return { breadcrumbs: bcs, crash, stackTrace, metadata, sdkId, nativeAppInfo };
 }
 
 // ── Error Display ─────────────────────────────────────────────────────────────
@@ -335,29 +360,6 @@ function showError(msg) {
 }
 
 // ── Stats Rendering ───────────────────────────────────────────────────────────
-function renderStats() {
-  const bcs = allBreadcrumbs;
-
-  document.getElementById('statTotal').textContent = bcs.length;
-
-  const timestamps = bcs.map(b => b.timestamp).filter(Boolean);
-  if (timestamps.length >= 2) {
-    const dur = Math.max(...timestamps) - Math.min(...timestamps);
-    document.getElementById('statDuration').textContent = formatDuration(dur);
-  }
-
-  const screens = new Set(
-    bcs.filter(b => b.type === 'ui.lifecycle' && b.className).map(b => b.className)
-  );
-  document.getElementById('statScreens').textContent = screens.size;
-
-  document.getElementById('statNetwork').textContent =
-    bcs.filter(b => b.type === 'network.request').length;
-
-  document.getElementById('statUser').textContent =
-    bcs.filter(b => b.type === 'user.event').length;
-}
-
 // ── Filter Chip Rendering ─────────────────────────────────────────────────────
 function renderFilterChips() {
   const counts = {};
@@ -454,23 +456,17 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ── View Switch ───────────────────────────────────────────────────────────────
-function setView(view) {
-  currentView = view;
-  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
-  document.getElementById('breadcrumbView').style.display = view === 'breadcrumb' ? '' : 'none';
-  document.getElementById('stacktraceView').style.display = view === 'stacktrace' ? '' : 'none';
-}
-
 // ── Stack Trace Rendering (Crashlytics-style) ────────────────────────────────
 function renderStackTrace() {
   renderCrashSummary();
   renderMetaGrid();
+  renderCharts();
+  renderCrashLog();
   renderThreads();
+  document.getElementById('crashDrilldownGrid').style.display = (crashMetadata || crashEvent) ? '' : 'none';
+  document.getElementById('crashLogWrap').style.display = crashEvent ? '' : 'none';
 }
 
-// shared by the Diagnostic tab's crash box and the breadcrumb timeline's crash card
-// so the two render identically
 function getCrashSummaryData() {
   if (!crashMetadata && !crashEvent) return null;
 
@@ -479,9 +475,6 @@ function getCrashSummaryData() {
   const signal        = crashMetadata ? crashMetadata.signal : null;
   const signalName    = signal != null ? (SIGNAL_NAMES[signal] || `Signal ${signal}`) : null;
   const reason         = (crashEvent && crashEvent.message) || (crashMetadata && crashMetadata.title) || dtype.label;
-  const crashedThread  = stackTraceData && stackTraceData.threads
-    ? stackTraceData.threads.find(t => t.crashed)
-    : null;
 
   const heading = isCrash
     ? `Fatal Exception${signalName ? ': ' + signalName : ''}`
@@ -496,8 +489,8 @@ function getCrashSummaryData() {
     tags.unshift(`<span class="tag">${platform.icon} <strong>${escapeHtml(platform.label)}</strong></span>`);
   }
 
-  if (crashedThread) {
-    tags.push(`<span class="tag">crashed on <strong>${escapeHtml(crashedThread.name || 'Thread ' + crashedThread.id)}</strong></span>`);
+  if (crashMetadata && crashMetadata.source != null) {
+    tags.push(`<span class="tag">Source <strong>${escapeHtml(crashMetadata.source)}</strong></span>`);
   }
 
   return { dtype, heading, reason, tags };
@@ -505,11 +498,6 @@ function getCrashSummaryData() {
 
 function crashSummaryInnerHTML({ dtype, heading, reason, tags }) {
   return `
-    <div class="crash-summary-head">
-      <span class="crash-summary-icon">${dtype.icon}</span>
-      <span class="crash-summary-heading" style="color:${dtype.color}">${escapeHtml(heading)}</span>
-      <button class="btn btn-ghost crash-download-btn" onclick="downloadCrashReport()">⬇ Download Report</button>
-    </div>
     ${reason ? `<div class="crash-summary-reason">${escapeHtml(reason)}</div>` : ''}
     <div class="crash-summary-tags">${tags.join('')}</div>
   `;
@@ -678,22 +666,55 @@ function buildCrashReportText() {
   return header.join('\n') + '\n\n' + body + '\n';
 }
 
-function downloadCrashReport() {
-  const blob = new Blob([buildCrashReportText()], { type: 'text/plain;charset=utf-8' });
+function downloadTextFile(text, filename) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = `crash-report-${Date.now()}.txt`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-// shared by the Diagnostic tab's crash box (#crashSummary) and the breadcrumb
-// timeline's crash box (#crashSummaryBreadcrumb) so the two render identically
-function renderCrashSummary(elId = 'crashSummary') {
-  const el = document.getElementById(elId);
+function downloadCrashReport() {
+  downloadTextFile(buildCrashReportText(), `crash-report-${Date.now()}.txt`);
+}
+
+// plain-text export of the event timeline — same ordering as the on-screen
+// timeline (respects the current sort), one line per breadcrumb
+function buildBreadcrumbReportText() {
+  const platformLabel = (getPlatform(currentSdkId) || {}).label || 'Unknown';
+  const header = [`Platform:      ${platformLabel}`];
+  if (crashEvent && crashEvent.time) header.push(`Date/Time:     ${new Date(crashEvent.time).toISOString()}`);
+  header.push(`Total Events:  ${allBreadcrumbs.length}`);
+
+  const sorted = [...allBreadcrumbs].sort((a, b) =>
+    sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp
+  );
+
+  const lines = sorted.map(bc => {
+    const label = getConfig(bc.type).label;
+    return `${new Date(bc.timestamp).toISOString()}  [${label}]  ${buildMainText(bc)}`;
+  });
+
+  return header.join('\n') + '\n\n' + (lines.join('\n') || '(no events)') + '\n';
+}
+
+function downloadBreadcrumbReport() {
+  downloadTextFile(buildBreadcrumbReportText(), `breadcrumb-report-${Date.now()}.txt`);
+}
+
+// modal's single Download Report button — sends whichever report matches
+// the segment currently open (Diagnostic → crash report, Breadcrumbs → timeline)
+function downloadModalReport() {
+  if (currentView === 'breadcrumb') downloadBreadcrumbReport();
+  else downloadCrashReport();
+}
+
+function renderCrashSummary() {
+  const el = document.getElementById('crashSummary');
   const data = getCrashSummaryData();
   if (!data) { el.innerHTML = ''; el.removeAttribute('style'); el.style.display = 'none'; return; }
 
@@ -721,27 +742,194 @@ function renderPlatformBadge() {
   el.classList.add('visible');
 }
 
+// title/signal/exceptionCode/exceptionType get special treatment elsewhere
+// (message fallback, or the crash heading/tags) — everything else, including
+// performance fields like hangDuration/launchDuration/totalCPUTime/
+// writesCaused, shows here whenever it's present, regardless of the current
+// diagnostic type
+// appVersion/appBuildVersion are shown explicitly up top (App Version from
+// NATIVEAPP, Build Version right after it) — skip them here so they don't
+// also print a second time from the generic eMeta loop
+const META_GRID_SKIP = new Set(['title', 'signal', 'exceptionCode', 'exceptionType', 'source', 'appVersion', 'appBuildVersion']);
+
 function renderMetaGrid() {
   const container = document.getElementById('metaGrid');
   container.innerHTML = '';
-  if (!crashMetadata) return;
 
-  const dtype = getDiagnosticType(crashEvent && crashEvent.type);
-  const skip  = new Set(['title', ...dtype.fields]);
-
-  Object.keys(crashMetadata).forEach(key => {
-    if (skip.has(key)) return;
-    let value = crashMetadata[key];
-    if (typeof value === 'boolean') value = value ? 'Yes' : 'No';
-
+  const addCard = (label, value) => {
     const card = document.createElement('div');
     card.className = 'meta-card';
     card.innerHTML = `
-      <div class="meta-label">${escapeHtml(META_LABELS[key] || key)}</div>
+      <div class="meta-label">${escapeHtml(label)}</div>
       <div class="meta-value">${escapeHtml(value)}</div>
     `;
     container.appendChild(card);
+  };
+
+  // App Version from NATIVEAPP directly, not eMeta (eMeta may carry its own,
+  // different appVersion, or none of these fields at all) — Build Version
+  // right after it, then the rest of the NATIVEAPP-level fields
+  if (nativeAppInfo && nativeAppInfo.appVersion) addCard('App Version', nativeAppInfo.appVersion);
+  if (crashMetadata && crashMetadata.appBuildVersion != null) addCard('Build Version', crashMetadata.appBuildVersion);
+  if (nativeAppInfo) {
+    if (nativeAppInfo.sdkVersion)  addCard('SDK Version', nativeAppInfo.sdkVersion);
+    if (nativeAppInfo.deviceModel) addCard('Model', nativeAppInfo.deviceModel);
+  }
+
+  if (!crashMetadata) return;
+
+  Object.keys(crashMetadata).forEach(key => {
+    if (META_GRID_SKIP.has(key)) return;
+    let value = crashMetadata[key];
+    if (typeof value === 'boolean') value = value ? 'Yes' : 'No';
+    addCard(META_LABELS[key] || key, value);
   });
+}
+
+// ── Crash Charts (2x2 donut grid, mirrors the Error Drilldown layout) ───────
+const CHART_COLORS = ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#1d4ed8'];
+
+function countsToSegments(counts) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({ label, count, pct: total ? (count / total * 100) : 0 }));
+}
+
+function singleValueSegment(value) {
+  const label = (value != null && value !== '') ? String(value) : 'Unknown';
+  return [{ label, count: 1, pct: 100 }];
+}
+
+// how many times each screen (ui.lifecycle className) was visited in the
+// session's breadcrumb trail — closest thing to "Top Pages" a crash payload has
+function computePageBreakdown() {
+  const counts = {};
+  allBreadcrumbs.forEach(bc => {
+    if (bc.type === 'ui.lifecycle' && bc.className) {
+      counts[bc.className] = (counts[bc.className] || 0) + 1;
+    }
+  });
+  return countsToSegments(counts);
+}
+
+function renderDonut(segments) {
+  if (!segments.length) return `<div class="chart-donut chart-donut-empty"></div>`;
+  let acc = 0;
+  const stops = segments.map((s, i) => {
+    const start = acc;
+    acc += s.pct;
+    return `${CHART_COLORS[i % CHART_COLORS.length]} ${start}% ${acc}%`;
+  }).join(', ');
+  return `<div class="chart-donut" style="background: conic-gradient(${stops})"></div>`;
+}
+
+function renderChartCard(title, segments) {
+  const top = segments.slice(0, 4);
+  const rows = top.map((s, i) => `
+    <div class="chart-legend-row">
+      <span class="chart-legend-dot" style="background:${CHART_COLORS[i % CHART_COLORS.length]}"></span>
+      <span class="chart-legend-label">${escapeHtml(s.label)}</span>
+      <span class="chart-legend-count">${s.count}</span>
+      <span class="chart-legend-pct">${s.pct.toFixed(2)}%</span>
+    </div>
+  `).join('');
+
+  return `
+    <div class="chart-card">
+      <div class="chart-card-title">${escapeHtml(title)}</div>
+      ${renderDonut(segments)}
+      <div class="chart-legend">${rows || '<div class="chart-legend-empty">No data</div>'}</div>
+    </div>
+  `;
+}
+
+function renderCharts() {
+  const container = document.getElementById('crashCharts');
+  if (!crashMetadata && !stackTraceData) { container.innerHTML = ''; return; }
+
+  const locationSeg = singleValueSegment(crashMetadata && crashMetadata.regionFormat);
+  const pageSeg   = computePageBreakdown();
+  const deviceSeg = singleValueSegment(crashMetadata && crashMetadata.deviceType);
+  const osSeg     = singleValueSegment(crashMetadata && crashMetadata.osVersion);
+
+  container.innerHTML = [
+    renderChartCard('Top Locations', locationSeg),
+    renderChartCard('Top Pages', pageSeg),
+    renderChartCard('Top Device', deviceSeg),
+    renderChartCard('Top OS', osSeg),
+  ].join('');
+}
+
+// most recently visited screen (ui.lifecycle className) — used as "Page Name"
+// in the crash log row, same source as the Top Pages chart
+function getLastPageName() {
+  const pages = allBreadcrumbs.filter(bc => bc.type === 'ui.lifecycle' && bc.className);
+  if (!pages.length) return '—';
+  return pages.reduce((a, b) => (b.timestamp > a.timestamp ? b : a)).className;
+}
+
+// ── Crash Log Table (mirrors the portal's crash session grid) ──────────────
+// one row per parsed payload — every column comes straight from the payload,
+// nothing invented (Traffic Segment / Content Groups / Onload aren't in a
+// single crash JSON, so they're left out rather than faked)
+// "Report" opens a focused modal with just the Event Timeline (Breadcrumbs
+// side) or just the Threads list (Diagnostic side) — reparents the real,
+// live elements in/out rather than duplicating them, so it's always in sync
+// with whatever's currently rendered, no separate render path to maintain.
+function openReportModal() {
+  document.getElementById('modalTimelineSlot').appendChild(document.getElementById('breadcrumbGroup'));
+  document.getElementById('modalThreadsSlot').appendChild(document.getElementById('threadsWrap'));
+  setModalView(currentView === 'stacktrace' ? 'stacktrace' : 'breadcrumb');
+  document.getElementById('reportModal').style.display = 'flex';
+}
+
+function closeReportModal() {
+  const home = document.getElementById('modalContentHome');
+  home.appendChild(document.getElementById('breadcrumbGroup'));
+  home.appendChild(document.getElementById('threadsWrap'));
+  document.getElementById('reportModal').style.display = 'none';
+}
+
+function setModalView(view) {
+  currentView = view; // remembered so reopening the modal lands on the last tab used
+  document.querySelectorAll('#modalViewSwitch .view-tab').forEach(t =>
+    t.classList.toggle('active', t.id === (view === 'breadcrumb' ? 'modalTabBreadcrumb' : 'modalTabStacktrace'))
+  );
+  document.getElementById('modalTimelineSlot').style.display = view === 'breadcrumb' ? '' : 'none';
+  document.getElementById('modalThreadsSlot').style.display  = view === 'stacktrace' ? '' : 'none';
+  document.getElementById('modalDownloadBtn').textContent =
+    view === 'breadcrumb' ? '⬇ Download Breadcrumb Report' : '⬇ Download Diagnostic Report';
+}
+
+function renderCrashLog() {
+  const body = document.getElementById('crashLogBody');
+  const pagerInfo = document.getElementById('crashLogPagerInfo');
+
+  if (!crashEvent) {
+    body.innerHTML = `<tr><td class="crash-log-empty" colspan="6">No crash data</td></tr>`;
+    if (pagerInfo) pagerInfo.textContent = '0 to 0 (0)';
+    return;
+  }
+
+  const errorTime  = formatFullDateTime(crashEvent.time);
+  const session    = crashEvent.session != null ? escapeHtml(crashEvent.session) : '—';
+  const pageName   = escapeHtml(getLastPageName());
+  const errorType  = escapeHtml(crashEvent.type || '—');
+  const errorCount = crashEvent.errorCount != null ? crashEvent.errorCount : 1;
+
+  body.innerHTML = `
+    <tr>
+      <td>${escapeHtml(errorTime)}</td>
+      <td>${session}</td>
+      <td><button class="crash-log-view-link" onclick="openReportModal()">Report</button></td>
+      <td>${pageName}</td>
+      <td>${errorType}</td>
+      <td>${errorCount}</td>
+    </tr>
+  `;
+
+  if (pagerInfo) pagerInfo.textContent = '1 to 1 (1)';
 }
 
 function renderFrameRow(frame) {
@@ -870,7 +1058,7 @@ function parseAndRender() {
   if (!raw) { showError('Please paste a JSON payload first.'); return; }
 
   try {
-    const { breadcrumbs, crash, stackTrace, metadata, sdkId } = parsePayload(raw);
+    const { breadcrumbs, crash, stackTrace, metadata, sdkId, nativeAppInfo: nativeInfo } = parsePayload(raw);
     errEl.classList.remove('visible');
 
     const hasBreadcrumbs = breadcrumbs && breadcrumbs.length > 0;
@@ -887,35 +1075,27 @@ function parseAndRender() {
     stackTraceData = stackTrace;
     crashMetadata  = metadata;
     currentSdkId   = sdkId;
+    nativeAppInfo  = nativeInfo;
     renderPlatformBadge();
 
-    document.getElementById('tabBreadcrumb').style.display = hasBreadcrumbs ? '' : 'none';
-    document.getElementById('tabStacktrace').style.display = (hasStackTrace || hasMetadata) ? '' : 'none';
-    document.getElementById('viewSwitch').classList.add('visible');
+    document.getElementById('filterToolbar').classList.add('visible');
+
+    // crash summary / info panel / charts / crash log — one unified view,
+    // shown whenever there's a crash event or metadata, independent of
+    // whether breadcrumbs or a full stack trace are also present
+    renderStackTrace();
 
     if (hasBreadcrumbs) {
       activeFilters = new Set(breadcrumbs.map(b => b.type));
-      renderCrashSummary('crashSummaryBreadcrumb');
-      renderStats();
       renderFilterChips();
       renderTimeline();
 
       document.getElementById('controls').classList.add('visible');
-      document.getElementById('statsRow').classList.add('visible');
       document.getElementById('timelineWrap').classList.add('visible');
+    } else {
+      document.getElementById('controls').classList.remove('visible');
+      document.getElementById('timelineWrap').classList.remove('visible');
     }
-
-    if (hasStackTrace || hasMetadata) {
-      renderStackTrace();
-    }
-
-    // stay on whichever tab is currently open if the new payload still has
-    // data for it, instead of always jumping back to Breadcrumbs
-    const targetView =
-      currentView === 'stacktrace' && (hasStackTrace || hasMetadata) ? 'stacktrace' :
-      currentView === 'breadcrumb' && hasBreadcrumbs                 ? 'breadcrumb' :
-      hasBreadcrumbs                                                 ? 'breadcrumb' : 'stacktrace';
-    setView(targetView);
 
   } catch (e) {
     showError('Invalid JSON: ' + e.message);
@@ -926,12 +1106,15 @@ function clearAll() {
   document.getElementById('jsonInput').value = '';
   document.getElementById('errorMsg').classList.remove('visible');
   document.getElementById('controls').classList.remove('visible');
-  document.getElementById('statsRow').classList.remove('visible');
   document.getElementById('timelineWrap').classList.remove('visible');
   document.getElementById('timeline').innerHTML = '';
-  document.getElementById('viewSwitch').classList.remove('visible');
+  document.getElementById('filterToolbar').classList.remove('visible');
   document.getElementById('crashSummary').innerHTML = '';
   document.getElementById('metaGrid').innerHTML = '';
+  document.getElementById('crashCharts').innerHTML = '';
+  document.getElementById('crashDrilldownGrid').style.display = 'none';
+  document.getElementById('crashLogBody').innerHTML = '';
+  document.getElementById('crashLogWrap').style.display = 'none';
   document.getElementById('threadsList').innerHTML = '';
   document.getElementById('threadCount').textContent = '';
   allBreadcrumbs = [];
@@ -939,8 +1122,8 @@ function clearAll() {
   stackTraceData = null;
   crashMetadata  = null;
   currentSdkId   = null;
+  nativeAppInfo  = null;
   renderPlatformBadge();
-  setView('breadcrumb');
 }
 
 // ── Keyboard Shortcut: Cmd/Ctrl + Enter ──────────────────────────────────────
@@ -956,3 +1139,6 @@ function loadExample() {
 
 // show the example on first load so the format is visible with no payload of your own
 loadExample();
+
+// filter toolbar defaults — today's date instead of a blank picker
+document.getElementById('filterDate').valueAsDate = new Date();
