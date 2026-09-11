@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-11
+- Replaced the single "Load Example" button with a picker grouped by platform (iOS, Android, React Native), added new sample payloads (Hang, Excess CPU, Excess Disk Write, Slow Launch, Memory, Force Restart, Android Crash, Android Fatal), and fixed the picker's width/label display.
 - Moved the report download out of the modal header into each segment's own header as an Export button.
 - Renamed the Report modal's Diagnostic segment and download button to Stack Trace.
 - Fixed the Threads plain-text view padding out a huge gap before Android/React Native frames, which don't have a binary/address column.
