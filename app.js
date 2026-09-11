@@ -713,13 +713,6 @@ function downloadBreadcrumbReport() {
   downloadTextFile(buildBreadcrumbReportText(), `breadcrumb-report-${Date.now()}.txt`);
 }
 
-// modal's single Download Report button — sends whichever report matches
-// the segment currently open (Diagnostic → crash report, Breadcrumbs → timeline)
-function downloadModalReport() {
-  if (currentView === 'breadcrumb') downloadBreadcrumbReport();
-  else downloadCrashReport();
-}
-
 function renderCrashSummary() {
   const el = document.getElementById('crashSummary');
   const data = getCrashSummaryData();
@@ -905,8 +898,6 @@ function setModalView(view) {
   );
   document.getElementById('modalTimelineSlot').style.display = view === 'breadcrumb' ? '' : 'none';
   document.getElementById('modalThreadsSlot').style.display  = view === 'stacktrace' ? '' : 'none';
-  document.getElementById('modalDownloadBtn').textContent =
-    view === 'breadcrumb' ? '⬇ Download Breadcrumb Report' : '⬇ Download Stack Trace Report';
 }
 
 function renderCrashLog() {

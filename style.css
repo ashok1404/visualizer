@@ -201,8 +201,6 @@ header p {
   gap: 10px;
 }
 
-.modal-header-actions .crash-download-btn { margin-left: 0; }
-
 .modal-title {
   font-family: 'Syne', sans-serif;
   font-size: 16px;
@@ -997,6 +995,12 @@ textarea::placeholder { color: var(--text-muted); }
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.timeline-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .timeline-title {

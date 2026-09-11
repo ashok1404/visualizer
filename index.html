@@ -134,8 +134,11 @@
       <!-- TIMELINE -->
       <div class="timeline-wrap" id="timelineWrap">
         <div class="timeline-header">
-          <span class="timeline-title">Event Timeline</span>
-          <span class="result-count" id="resultCount"></span>
+          <div class="timeline-header-left">
+            <span class="timeline-title">Event Timeline</span>
+            <span class="result-count" id="resultCount"></span>
+          </div>
+          <button class="btn btn-ghost crash-download-btn segment-download-btn" onclick="downloadBreadcrumbReport()">⬇ Export</button>
         </div>
         <div class="timeline" id="timeline"></div>
         <div class="empty-state" id="emptyState">
@@ -152,9 +155,12 @@
           <span class="timeline-title">Threads</span>
           <span class="result-count" id="threadCount"></span>
         </div>
-        <div class="crash-view-toggle" id="stackViewToggle" style="display:none">
-          <button class="crash-view-btn" id="threadViewBtnCell" onclick="setThreadViewMode('cell')">🔍 Detailed</button>
-          <button class="crash-view-btn active" id="threadViewBtnText" onclick="setThreadViewMode('text')">📄 Plain Text</button>
+        <div class="timeline-header-right">
+          <div class="crash-view-toggle" id="stackViewToggle" style="display:none">
+            <button class="crash-view-btn" id="threadViewBtnCell" onclick="setThreadViewMode('cell')">🔍 Detailed</button>
+            <button class="crash-view-btn active" id="threadViewBtnText" onclick="setThreadViewMode('text')">📄 Plain Text</button>
+          </div>
+          <button class="btn btn-ghost crash-download-btn segment-download-btn" onclick="downloadCrashReport()">⬇ Export</button>
         </div>
       </div>
       <div id="threadsList"></div>
@@ -170,7 +176,6 @@
     <div class="modal-header">
       <span class="modal-title">Crash Report</span>
       <div class="modal-header-actions">
-        <button class="btn btn-ghost crash-download-btn" id="modalDownloadBtn" onclick="downloadModalReport()">⬇ Download Stack Trace Report</button>
         <button class="modal-close" onclick="closeReportModal()" aria-label="Close">✕</button>
       </div>
     </div>
