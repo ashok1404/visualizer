@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-11
+- Renamed the Report modal's Diagnostic segment and download button to Stack Trace.
 - Fixed the Threads plain-text view padding out a huge gap before Android/React Native frames, which don't have a binary/address column.
 - Swapped the crash charts grid to App Version / OS Version / Device Type / Top Pages, and replaced the crash log's Error Type column with Traffic Segment.
 - Updated the default example payload to a current MetricKit-sourced crash sample, with meta grid labels for its `platform`/`build`/`arch` fields.
