@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-11
+- Swapped the crash charts grid to App Version / OS Version / Device Type / Top Pages, and replaced the crash log's Error Type column with Traffic Segment.
 - Updated the default example payload to a current MetricKit-sourced crash sample, with meta grid labels for its `platform`/`build`/`arch` fields.
 - Redesigned the crash detail UI: unified the Breadcrumb/Diagnostic tabs into one crash view (summary, info panel, 2x2 chart grid, crash log table), and moved the Event Timeline and Threads into a focused Report modal with its own segment switcher and context-aware report downloads.
 
