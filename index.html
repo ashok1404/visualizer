@@ -170,13 +170,13 @@
     <div class="modal-header">
       <span class="modal-title">Crash Report</span>
       <div class="modal-header-actions">
-        <button class="btn btn-ghost crash-download-btn" id="modalDownloadBtn" onclick="downloadModalReport()">⬇ Download Diagnostic Report</button>
+        <button class="btn btn-ghost crash-download-btn" id="modalDownloadBtn" onclick="downloadModalReport()">⬇ Download Stack Trace Report</button>
         <button class="modal-close" onclick="closeReportModal()" aria-label="Close">✕</button>
       </div>
     </div>
     <div class="modal-body">
       <div class="view-switch visible" id="modalViewSwitch">
-        <button class="view-tab active" id="modalTabStacktrace" onclick="setModalView('stacktrace')">🧵 Diagnostic</button>
+        <button class="view-tab active" id="modalTabStacktrace" onclick="setModalView('stacktrace')">🧵 Stack Trace</button>
         <button class="view-tab" id="modalTabBreadcrumb" onclick="setModalView('breadcrumb')">🍞 Breadcrumbs</button>
       </div>
       <div id="modalTimelineSlot"></div>

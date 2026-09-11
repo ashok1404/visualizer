@@ -906,7 +906,7 @@ function setModalView(view) {
   document.getElementById('modalTimelineSlot').style.display = view === 'breadcrumb' ? '' : 'none';
   document.getElementById('modalThreadsSlot').style.display  = view === 'stacktrace' ? '' : 'none';
   document.getElementById('modalDownloadBtn').textContent =
-    view === 'breadcrumb' ? '⬇ Download Breadcrumb Report' : '⬇ Download Diagnostic Report';
+    view === 'breadcrumb' ? '⬇ Download Breadcrumb Report' : '⬇ Download Stack Trace Report';
 }
 
 function renderCrashLog() {
