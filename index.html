@@ -33,9 +33,31 @@
     <div class="input-footer">
       <span class="error-msg" id="errorMsg"></span>
       <div style="display:flex; gap:8px; margin-left:auto">
-        <button class="btn btn-ghost" onclick="loadExample()">Load Example</button>
-        <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
-        <button class="btn btn-primary" onclick="parseAndRender()">Visualize →</button>
+        <select class="btn btn-ghost example-select" id="exampleType" onchange="loadExampleByType(this.value)">
+          <option id="exampleTypePlaceholder" value="" disabled selected>Load Example ▾</option>
+          <optgroup label="iOS">
+            <option value="ios-crash">Crash</option>
+            <option value="ios-anr">ANR</option>
+            <option value="ios-memory">Memory</option>
+            <option value="ios-forceRestart">Force Restart</option>
+            <option value="ios-hang">Hang</option>
+            <option value="ios-slowLaunch">Slow Launch</option>
+            <option value="ios-excessCpu">Excess CPU</option>
+            <option value="ios-excessDiskWrite">Excess Disk Write</option>
+          </optgroup>
+          <optgroup label="Android">
+            <option value="android-crash">Crash</option>
+            <option value="android-anr">ANR</option>
+            <option value="android-memory">Memory</option>
+            <option value="android-fatal">Fatal</option>
+          </optgroup>
+          <optgroup label="React Native">
+            <option value="react-crash">Crash</option>
+            <option value="react-nonFatal">Non-Fatal</option>
+          </optgroup>
+        </select>
+        <button class="btn btn-ghost" onclick="resetExampleSelect(); clearAll()">Clear</button>
+        <button class="btn btn-primary" onclick="resetExampleSelect(); parseAndRender()">Visualize →</button>
       </div>
     </div>
   </div>

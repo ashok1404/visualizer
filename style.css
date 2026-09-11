@@ -184,6 +184,9 @@ header p {
   border-radius: 14px;
   width: 100%;
   max-width: 1200px;
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
@@ -226,6 +229,7 @@ header p {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  flex: 1;
 }
 
 @media (max-width: 640px) {
@@ -285,6 +289,19 @@ header p {
 }
 .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
 .btn-ghost:active { background: var(--surface2); transform: scale(0.96); transition-duration: 0.05s; }
+
+.example-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: transparent;
+  width: 200px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  text-align-last: center;
+}
+.example-select option { color: var(--text); background: var(--bg); }
 
 /* ── TEXTAREA ── */
 textarea {
