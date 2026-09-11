@@ -852,16 +852,16 @@ function renderCharts() {
   const container = document.getElementById('crashCharts');
   if (!crashMetadata && !stackTraceData) { container.innerHTML = ''; return; }
 
-  const locationSeg = singleValueSegment(crashMetadata && crashMetadata.regionFormat);
+  const appVersionSeg = singleValueSegment(nativeAppInfo && nativeAppInfo.appVersion);
+  const osSeg     = singleValueSegment((crashMetadata && crashMetadata.osVersion) || (crashMetadata && crashMetadata.platform));
+  const deviceSeg = singleValueSegment((crashMetadata && crashMetadata.deviceType) || (nativeAppInfo && nativeAppInfo.deviceModel));
   const pageSeg   = computePageBreakdown();
-  const deviceSeg = singleValueSegment(crashMetadata && crashMetadata.deviceType);
-  const osSeg     = singleValueSegment(crashMetadata && crashMetadata.osVersion);
 
   container.innerHTML = [
-    renderChartCard('Top Locations', locationSeg),
+    renderChartCard('App Version', appVersionSeg),
+    renderChartCard('OS Version', osSeg),
+    renderChartCard('Device Type', deviceSeg),
     renderChartCard('Top Pages', pageSeg),
-    renderChartCard('Top Device', deviceSeg),
-    renderChartCard('Top OS', osSeg),
   ].join('');
 }
 
@@ -919,7 +919,7 @@ function renderCrashLog() {
   const errorTime  = formatFullDateTime(crashEvent.time);
   const session    = crashEvent.session != null ? escapeHtml(crashEvent.session) : '—';
   const pageName   = escapeHtml(getLastPageName());
-  const errorType  = escapeHtml(crashEvent.type || '—');
+  const trafficSegment = 'ScreenTracker';
   const errorCount = crashEvent.errorCount != null ? crashEvent.errorCount : 1;
 
   body.innerHTML = `
@@ -928,7 +928,7 @@ function renderCrashLog() {
       <td>${session}</td>
       <td><button class="crash-log-view-link" onclick="openReportModal()">Report</button></td>
       <td>${pageName}</td>
-      <td>${errorType}</td>
+      <td>${trafficSegment}</td>
       <td>${errorCount}</td>
     </tr>
   `;
