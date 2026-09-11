@@ -530,6 +530,9 @@ function formatFrames(frames) {
   if (!frames.length) return '(no frames)';
   return frames.map(frame => {
     const { binary, address, symbol } = parseFrameLine(frame.fLine);
+    // no binary/address to show (Android/RN-style frames) — skip that column
+    // instead of padding it out, which would leave a big gap before the symbol
+    if (!binary && !address) return `${String(frame.i).padStart(3)}  ${symbol}`;
     return `${String(frame.i).padStart(3)}  ${binary.padEnd(30)} ${address}  ${symbol}`;
   }).join('\n');
 }
