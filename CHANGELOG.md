@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-15
+- Crash log table now uses a plain system font, and its Report column link now reads "View".
 - Crash log's Session column now shows the same random session id used in the breadcrumb header, instead of the payload's internal counter.
 - Fixed the breadcrumb timeline not appearing until switching Report modal tabs (a CSS fade-in animation never started because the rows were rendered while hidden), and made the modal always open on Stack Trace by default.
 - Redesigned the breadcrumb Event Timeline to match the live portal: icon-circle rows with inline category/description text and precise timestamps, a session header (session id, device info, region) with Export moved into it, and removed the filter chips/sort row in favor of a fixed newest-first order.
