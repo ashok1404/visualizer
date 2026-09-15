@@ -754,6 +754,7 @@ textarea::placeholder { color: var(--text-muted); }
   width: 100%;
   border-collapse: collapse;
   font-size: 12.5px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .crash-log-table th {

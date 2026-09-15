@@ -877,7 +877,7 @@ function renderCrashLog() {
     <tr>
       <td>${escapeHtml(errorTime)}</td>
       <td>${session}</td>
-      <td><button class="crash-log-view-link" onclick="openReportModal()">Report</button></td>
+      <td><button class="crash-log-view-link" onclick="openReportModal()">View</button></td>
       <td>${pageName}</td>
       <td>${trafficSegment}</td>
       <td>${errorCount}</td>
