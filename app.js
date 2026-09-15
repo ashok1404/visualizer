@@ -63,7 +63,6 @@ const sortOrder    = 'desc'; // newest first — fixed, no UI to change it
 let crashEvent     = null;
 let stackTraceData = null;
 let crashMetadata  = null;
-let currentView    = 'stacktrace';
 let currentSdkId   = null;
 let nativeAppInfo  = null; // appVersion/sdkVersion/deviceModel — straight from NATIVEAPP, not eMeta
 let threadViewMode = 'text'; // 'cell' (thread cards) or 'text' (raw stack trace preview, default)
@@ -387,14 +386,13 @@ function renderTimeline() {
     sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp
   );
 
-  sorted.forEach((bc, idx) => {
+  sorted.forEach(bc => {
     const cfg  = getConfig(bc.type);
     const text = buildMainText(bc);
 
     const item = document.createElement('div');
     item.className        = 'bc-item';
     item.dataset.type     = bc.type;
-    item.style.animationDelay = `${Math.min(idx * 12, 300)}ms`;
 
     item.innerHTML = `
       <div class="bc-dot-wrap">
@@ -839,7 +837,7 @@ function getLastPageName() {
 function openReportModal() {
   document.getElementById('modalTimelineSlot').appendChild(document.getElementById('breadcrumbGroup'));
   document.getElementById('modalThreadsSlot').appendChild(document.getElementById('threadsWrap'));
-  setModalView(currentView === 'stacktrace' ? 'stacktrace' : 'breadcrumb');
+  setModalView('stacktrace'); // always open on Stack Trace by default
   document.getElementById('reportModal').style.display = 'flex';
 }
 
@@ -851,7 +849,6 @@ function closeReportModal() {
 }
 
 function setModalView(view) {
-  currentView = view; // remembered so reopening the modal lands on the last tab used
   document.querySelectorAll('#modalViewSwitch .view-tab').forEach(t =>
     t.classList.toggle('active', t.id === (view === 'breadcrumb' ? 'modalTabBreadcrumb' : 'modalTabStacktrace'))
   );
