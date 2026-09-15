@@ -19,28 +19,28 @@ function toggleTheme() {
 initTheme();
 
 // ── Type Configuration ───────────────────────────────────────────────────────
-const ICON_UI_LIFECYCLE = `<svg class="chip-icon" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg>`;
-const ICON_NETWORK_STATE = `<svg class="chip-icon" viewBox="0 0 24 24" fill="none"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_GRID = `<svg class="bc-icon-svg" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.8"/></svg>`;
+const ICON_WINDOW = `<svg class="bc-icon-svg" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><line x1="4" y1="9" x2="20" y2="9" stroke="currentColor" stroke-width="1.8"/></svg>`;
+const ICON_GEAR = `<svg class="bc-icon-svg" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_TAP = `<svg class="bc-icon-svg" viewBox="0 0 24 24" fill="none"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON_NETWORK_STATE = `<svg class="bc-icon-svg" viewBox="0 0 24 24" fill="none"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 const TYPE_CONFIG = {
-  'ui.lifecycle':   { label: 'UI Lifecycle',  icon: ICON_UI_LIFECYCLE, chipClass: 'chip-lifecycle', dot: '#8b5cf6', badge: '#8b5cf620', badgeBorder: '#8b5cf640' },
-  'network.request':{ label: 'Network',       icon: '🌐', chipClass: 'chip-network',   dot: '#10b981', badge: '#10b98120', badgeBorder: '#10b98140' },
-  'user.event':     { label: 'User Event',    icon: '👆', chipClass: 'chip-user',      dot: '#f59e0b', badge: '#f59e0b20', badgeBorder: '#f59e0b40' },
-  'app.lifecycle':  { label: 'App Lifecycle', icon: '🚀', chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
-  'app.launch':     { label: 'App Launch',    icon: '🚀', chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
-  'app.install':    { label: 'App Install',   icon: '📥', chipClass: 'chip-app',       dot: '#06b6d4', badge: '#06b6d420', badgeBorder: '#06b6d440' },
-  'network.state':  { label: 'Network State', icon: ICON_NETWORK_STATE, chipClass: 'chip-state',     dot: '#ec4899', badge: '#ec489920', badgeBorder: '#ec489940' },
-  'system.event':  { label: 'System Event', icon: '⚙️', chipClass: 'chip-state',     dot: '#9f48ec', badge: '#9f48ec20', badgeBorder: '#9f48ec40' },
+  'ui.lifecycle':   { label: 'Ui Lifecycle',  icon: ICON_WINDOW,        dot: '#8b5cf6' },
+  'network.request':{ label: 'Network',       icon: '🌐',               dot: '#10b981' },
+  'user.event':     { label: 'User Event',    icon: ICON_TAP,           dot: '#ef7f76' },
+  'app.lifecycle':  { label: 'App Lifecycle', icon: ICON_GRID,          dot: '#4f8ef7' },
+  'app.launch':     { label: 'App Launch',    icon: ICON_GRID,          dot: '#4f8ef7' },
+  'app.install':    { label: 'App Install',   icon: '📥',               dot: '#4f8ef7' },
+  'network.state':  { label: 'Connectivity',  icon: ICON_NETWORK_STATE, dot: '#ef7f76' },
+  'system.event':   { label: 'System Event',  icon: ICON_GEAR,          dot: '#9ca3af' },
 };
 
 function getConfig(type) {
   return TYPE_CONFIG[type] || {
     label: type,
     icon: '🔹',
-    chipClass: 'chip-nav',
     dot: '#4f8ef7',
-    badge: '#4f8ef720',
-    badgeBorder: '#4f8ef740',
   };
 }
 
@@ -59,8 +59,7 @@ const ANDROID_FATAL_PAYLOAD = [{"msg":"Fatal ANR: com.bluetriangle.android.demo/
 
 let allBreadcrumbs = [];
 
-let activeFilters  = new Set();
-let sortOrder      = 'desc';
+const sortOrder    = 'desc'; // newest first — fixed, no UI to change it
 let crashEvent     = null;
 let stackTraceData = null;
 let crashMetadata  = null;
@@ -146,14 +145,6 @@ function getPlatform(sdkId) {
 }
 
 // ── Formatting Helpers ───────────────────────────────────────────────────────
-function formatTime(ts) {
-  const d = new Date(ts);
-  const hms = d.toLocaleTimeString('en-US', {
-    hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit',
-  });
-  return hms + '.' + String(d.getMilliseconds()).padStart(3, '0');
-}
-
 // "2026-09-08 18:51 IST (+5:30)" style — local date/time plus the browser's UTC offset
 function formatFullDateTime(ts) {
   if (!ts) return '—';
@@ -168,67 +159,58 @@ function formatFullDateTime(ts) {
   return `${date} ${time} (${sign}${offH}:${offM})`;
 }
 
-function formatDelta(ms) {
-  if (ms < 1000) return `+${ms}ms`;
-  return `+${(ms / 1000).toFixed(1)}s`;
+// "3 Sep, 4:20 PM" style — matches the portal's Event Timeline row timestamps
+const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function formatShortDateTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const hours24 = d.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const ampm = hours24 < 12 ? 'AM' : 'PM';
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]}, ${hours12}:${mins} ${ampm}`;
 }
 
-function getStatusClass(code) {
-  if (!code) return '';
-  const n = parseInt(code, 10);
-  if (n >= 500) return 'status-err';
-  if (n >= 400) return 'status-warn';
-  return 'status-ok';
+// same as formatShortDateTime but with seconds + milliseconds — used for the
+// per-event Event Timeline rows, where that extra precision matters
+function formatEventDateTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const hours24 = d.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const ampm = hours24 < 12 ? 'AM' : 'PM';
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  const secs = String(d.getSeconds()).padStart(2, '0');
+  const ms   = String(d.getMilliseconds()).padStart(3, '0');
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]}, ${hours12}:${mins}:${secs}.${ms} ${ampm}`;
 }
 
 // ── Event Text Builders ──────────────────────────────────────────────────────
 function buildMainText(bc) {
   switch (bc.type) {
     case 'ui.lifecycle':
-      return `${bc.className} → ${bc.event}`;
+      return `${bc.event} · ${bc.className}`;
     case 'network.request':
       return bc.url ? bc.url.replace(/^https?:\/\//, '') : 'Unknown URL';
-    case 'user.event':
-      return `${bc.action} on ${bc.targetClass || ''}${bc.targetId ? ' · ' + bc.targetId.split(':').pop() : ''}`;
+    case 'user.event': {
+      const target = [bc.targetClass, bc.targetId].filter(Boolean).join(' ');
+      return `${target} -> ${bc.action} at (x: ${bc.x}, y: ${bc.y})`;
+    }
     case 'app.lifecycle':
-      return `App → ${bc.event}`;
+      return `App · ${bc.event}`;
     case 'app.launch':
       return `Launch · ${bc.launchType || ''}`;
     case 'app.install':
       return `Installed · v${bc.version || ''}`;
     case 'network.state':
-      return `Network → ${bc.state}`;
-    case 'system.event':
-      return `${bc.eventType} → ${bc.event}`;
+      return `Network changed to ${bc.state}`;
+    case 'system.event': {
+      const kind = bc.eventType ? bc.eventType.charAt(0).toUpperCase() + bc.eventType.slice(1) : 'Event';
+      return `${kind} changed to ${bc.event}`;
+    }
     default:
       return JSON.stringify(bc).slice(0, 80);
   }
-}
-
-function buildDetail(bc) {
-  const parts = [];
-
-  if (bc.type === 'network.request') {
-    if (bc.statusCode) {
-      const cls = getStatusClass(bc.statusCode);
-      parts.push(`<span><strong>status</strong> <span class="${cls}">${bc.statusCode}</span></span>`);
-    }
-    if (bc.url) {
-      parts.push(`<span><strong>url</strong> ${bc.url}</span>`);
-    }
-  }
-
-  if (bc.type === 'user.event') {
-    if (bc.targetId)    parts.push(`<span><strong>id</strong> ${bc.targetId}</span>`);
-    if (bc.targetClass) parts.push(`<span><strong>class</strong> ${bc.targetClass}</span>`);
-  }
-
-  if (bc.type === 'ui.lifecycle') {
-    parts.push(`<span><strong>class</strong> ${bc.className}</span>`);
-    parts.push(`<span><strong>event</strong> ${bc.event}</span>`);
-  }
-
-  return parts.join('');
 }
 
 // ── JSON Parsing ─────────────────────────────────────────────────────────────
@@ -371,50 +353,29 @@ function showError(msg) {
   el.classList.add('visible');
 }
 
-// ── Stats Rendering ───────────────────────────────────────────────────────────
-// ── Filter Chip Rendering ─────────────────────────────────────────────────────
-function renderFilterChips() {
-  const counts = {};
-  allBreadcrumbs.forEach(b => { counts[b.type] = (counts[b.type] || 0) + 1; });
-
-  const container = document.getElementById('filterChips');
-  container.innerHTML = '';
-
-  // preserve first-seen order
-  const types = [...new Set(allBreadcrumbs.map(b => b.type))];
-
-  types.forEach(type => {
-    const cfg  = getConfig(type);
-    const chip = document.createElement('div');
-    chip.className    = `filter-chip ${cfg.chipClass}`;
-    chip.dataset.type = type;
-    chip.innerHTML = `
-      <span class="dot"></span>
-      ${cfg.label}
-      <span class="count">${counts[type]}</span>
-    `;
-    chip.addEventListener('click', () => toggleFilter(type, chip));
-    container.appendChild(chip);
-  });
+// ── Breadcrumb Session Header ────────────────────────────────────────────────
+// payloads only ever carry a short internal counter (e.g. "col": 1) as
+// "session" — the real session id from the SDK is a long random number, so a
+// same-length random placeholder is shown instead of that counter value
+const SESSION_ID_DIGITS = 19;
+function generateRandomSessionId(digits) {
+  let id = String(Math.floor(Math.random() * 9) + 1); // no leading zero
+  for (let i = 1; i < digits; i++) id += Math.floor(Math.random() * 10);
+  return id;
 }
 
-function toggleFilter(type, chip) {
-  if (activeFilters.has(type)) {
-    activeFilters.delete(type);
-    chip.classList.add('inactive');
-  } else {
-    activeFilters.add(type);
-    chip.classList.remove('inactive');
-  }
-  applyFilters();
-}
+function renderBreadcrumbSessionHeader() {
+  const parts = [
+    formatShortDateTime(crashEvent && crashEvent.time),
+    'Mobile',
+    'Native App',
+    nativeAppInfo && nativeAppInfo.deviceModel,
+  ].filter(Boolean);
 
-// ── Sort ──────────────────────────────────────────────────────────────────────
-function setSort(order) {
-  sortOrder = order;
-  document.getElementById('sortAsc').classList.toggle('active',  order === 'asc');
-  document.getElementById('sortDesc').classList.toggle('active', order === 'desc');
-  renderTimeline();
+  document.getElementById('bcSessionId').textContent = generateRandomSessionId(SESSION_ID_DIGITS);
+  document.getElementById('bcSessionMeta').textContent = parts.join(' · ');
+  document.getElementById('bcSessionRegion').textContent =
+    (crashMetadata && crashMetadata.regionFormat) || '';
 }
 
 // ── Timeline Rendering ────────────────────────────────────────────────────────
@@ -427,9 +388,8 @@ function renderTimeline() {
   );
 
   sorted.forEach((bc, idx) => {
-    const cfg   = getConfig(bc.type);
-    const delta = idx > 0 ? Math.abs(bc.timestamp - sorted[idx - 1].timestamp) : 0;
-    const detail = buildDetail(bc);
+    const cfg  = getConfig(bc.type);
+    const text = buildMainText(bc);
 
     const item = document.createElement('div');
     item.className        = 'bc-item';
@@ -438,28 +398,18 @@ function renderTimeline() {
 
     item.innerHTML = `
       <div class="bc-dot-wrap">
-        <div class="bc-dot" style="background:${cfg.dot}"></div>
+        <div class="bc-icon" style="background:${cfg.dot}">${cfg.icon}</div>
       </div>
       <div class="bc-content">
-        <div class="bc-row">
-          <span class="bc-badge"
-            style="background:${cfg.badge};border:1px solid ${cfg.badgeBorder};color:${cfg.dot}">
-            ${cfg.icon} ${cfg.label}
-          </span>
-          <span class="bc-main" title="${buildMainText(bc)}">${buildMainText(bc)}</span>
-          <div class="bc-meta">
-            ${delta > 0 ? `<span class="bc-delta">${formatDelta(delta)}</span>` : ''}
-            <span class="bc-time">${formatTime(bc.timestamp)}</span>
-          </div>
-        </div>
-        ${detail ? `<div class="bc-detail">${detail}</div>` : ''}
+        <strong>${escapeHtml(cfg.label)}</strong> · <span class="bc-desc">${escapeHtml(text)}</span>
       </div>
+      <div class="bc-time">${formatEventDateTime(bc.timestamp)}</div>
     `;
 
     container.appendChild(item);
   });
 
-  applyFilters();
+  document.getElementById('emptyState').classList.toggle('visible', sorted.length === 0);
 }
 
 function escapeHtml(str) {
@@ -1041,26 +991,6 @@ function renderThreads() {
 }
 
 // ── Filter Application ────────────────────────────────────────────────────────
-function applyFilters() {
-  const items = document.querySelectorAll('.bc-item');
-  let visible = 0;
-
-  items.forEach(item => {
-    const type = item.dataset.type;
-    // crash card has no type — always visible
-    if (!type || activeFilters.has(type)) {
-      item.classList.remove('filtered-out');
-      visible++;
-    } else {
-      item.classList.add('filtered-out');
-    }
-  });
-
-  const total = allBreadcrumbs.length;
-  document.getElementById('resultCount').textContent = `${visible} / ${total} events`;
-
-  document.getElementById('emptyState').classList.toggle('visible', visible === 0);
-}
 
 // ── Main Entry ────────────────────────────────────────────────────────────────
 function parseAndRender() {
@@ -1098,14 +1028,11 @@ function parseAndRender() {
     renderStackTrace();
 
     if (hasBreadcrumbs) {
-      activeFilters = new Set(breadcrumbs.map(b => b.type));
-      renderFilterChips();
+      renderBreadcrumbSessionHeader();
       renderTimeline();
 
-      document.getElementById('controls').classList.add('visible');
       document.getElementById('timelineWrap').classList.add('visible');
     } else {
-      document.getElementById('controls').classList.remove('visible');
       document.getElementById('timelineWrap').classList.remove('visible');
     }
 
@@ -1117,9 +1044,11 @@ function parseAndRender() {
 function clearAll() {
   document.getElementById('jsonInput').value = '';
   document.getElementById('errorMsg').classList.remove('visible');
-  document.getElementById('controls').classList.remove('visible');
   document.getElementById('timelineWrap').classList.remove('visible');
   document.getElementById('timeline').innerHTML = '';
+  document.getElementById('bcSessionId').textContent = '';
+  document.getElementById('bcSessionMeta').textContent = '';
+  document.getElementById('bcSessionRegion').textContent = '';
   document.getElementById('filterToolbar').classList.remove('visible');
   document.getElementById('crashSummary').innerHTML = '';
   document.getElementById('metaGrid').innerHTML = '';

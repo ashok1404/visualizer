@@ -139,34 +139,22 @@
        the Report modal -->
   <div id="modalContentHome" style="display:none">
     <div id="breadcrumbGroup">
-      <!-- FILTER CONTROLS -->
-      <div class="controls" id="controls">
-        <div class="controls-left" id="filterChips"></div>
-        <div class="controls-right">
-          <span class="sort-label">Sort:</span>
-          <button class="sort-btn" id="sortAsc" onclick="setSort('asc')">
-            <span>Oldest first</span><span class="sort-arrow">↑</span>
-          </button>
-          <button class="sort-btn active" id="sortDesc" onclick="setSort('desc')">
-            <span>Newest first</span><span class="sort-arrow">↓</span>
-          </button>
+      <!-- SESSION HEADER -->
+      <div class="bc-session-header" id="bcSessionHeader">
+        <div class="bc-session-header-text">
+          <div class="bc-session-id" id="bcSessionId"></div>
+          <div class="bc-session-meta" id="bcSessionMeta"></div>
+          <div class="bc-session-region" id="bcSessionRegion"></div>
         </div>
+        <button class="btn btn-ghost crash-download-btn segment-download-btn" onclick="downloadBreadcrumbReport()">⬇ Export</button>
       </div>
 
       <!-- TIMELINE -->
       <div class="timeline-wrap" id="timelineWrap">
-        <div class="timeline-header">
-          <div class="timeline-header-left">
-            <span class="timeline-title">Event Timeline</span>
-            <span class="result-count" id="resultCount"></span>
-          </div>
-          <button class="btn btn-ghost crash-download-btn segment-download-btn" onclick="downloadBreadcrumbReport()">⬇ Export</button>
-        </div>
         <div class="timeline" id="timeline"></div>
         <div class="empty-state" id="emptyState">
           <div class="empty-state-icon">🔍</div>
-          <h3>No events match</h3>
-          <p>Try enabling more filter types above.</p>
+          <h3>No events found</h3>
         </div>
       </div>
     </div>
