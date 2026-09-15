@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-15
+- Redesigned the breadcrumb Event Timeline to match the live portal: icon-circle rows with inline category/description text and precise timestamps, a session header (session id, device info, region) with Export moved into it, and removed the filter chips/sort row in favor of a fixed newest-first order.
+
 ## 2026-09-11
 - Replaced the single "Load Example" button with a picker grouped by platform (iOS, Android, React Native), added new sample payloads (Hang, Excess CPU, Excess Disk Write, Slow Launch, Memory, Force Restart, Android Crash, Android Fatal), and fixed the picker's width/label display.
 - Moved the report download out of the modal header into each segment's own header as an Export button.
