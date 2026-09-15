@@ -64,6 +64,7 @@ let crashEvent     = null;
 let stackTraceData = null;
 let crashMetadata  = null;
 let currentSdkId   = null;
+let displaySessionId = null; // shared random session id — same value in the breadcrumb header and the crash log's Session column
 let nativeAppInfo  = null; // appVersion/sdkVersion/deviceModel — straight from NATIVEAPP, not eMeta
 let threadViewMode = 'text'; // 'cell' (thread cards) or 'text' (raw stack trace preview, default)
 
@@ -371,7 +372,7 @@ function renderBreadcrumbSessionHeader() {
     nativeAppInfo && nativeAppInfo.deviceModel,
   ].filter(Boolean);
 
-  document.getElementById('bcSessionId').textContent = generateRandomSessionId(SESSION_ID_DIGITS);
+  document.getElementById('bcSessionId').textContent = displaySessionId;
   document.getElementById('bcSessionMeta').textContent = parts.join(' · ');
   document.getElementById('bcSessionRegion').textContent =
     (crashMetadata && crashMetadata.regionFormat) || '';
@@ -867,7 +868,7 @@ function renderCrashLog() {
   }
 
   const errorTime  = formatFullDateTime(crashEvent.time);
-  const session    = crashEvent.session != null ? escapeHtml(crashEvent.session) : '—';
+  const session    = displaySessionId || '—';
   const pageName   = escapeHtml(getLastPageName());
   const trafficSegment = 'ScreenTracker';
   const errorCount = crashEvent.errorCount != null ? crashEvent.errorCount : 1;
@@ -1015,6 +1016,7 @@ function parseAndRender() {
     crashMetadata  = metadata;
     currentSdkId   = sdkId;
     nativeAppInfo  = nativeInfo;
+    displaySessionId = generateRandomSessionId(SESSION_ID_DIGITS);
     renderPlatformBadge();
 
     document.getElementById('filterToolbar').classList.add('visible');
@@ -1061,6 +1063,7 @@ function clearAll() {
   crashMetadata  = null;
   currentSdkId   = null;
   nativeAppInfo  = null;
+  displaySessionId = null;
   renderPlatformBadge();
 }
 
