@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-16
+- Replaced the crash summary's tag-pill row with a plain, light attribution note under the crash message, naming the detection source (Apple MetricKit diagnostic type, BlueTriangle ANR Watchdog, ForceRestart, or Android AppExitInfo) and linking to the official Apple doc only where one genuinely exists.
+
 ## 2026-09-15
 - Crash log table now uses a plain system font, and its Report column link now reads "View".
 - Crash log's Session column now shows the same random session id used in the breadcrumb header, instead of the payload's internal counter.
