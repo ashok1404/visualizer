@@ -101,13 +101,57 @@ const META_LABELS = {
 // slow launches, excess CPU, heavy disk writes, or memory warnings, and several
 // of those never carry a stack trace at all — only eMeta + msg.
 const DIAGNOSTIC_TYPES = {
-  crash:  { key: 'crash',  icon: '💥', label: 'Crash',            color: '#ef4444', fields: ['signal', 'exceptionType', 'exceptionCode'] },
-  hang:   { key: 'hang',   icon: '⏱️', label: 'Hang / ANR',        color: '#f59e0b', fields: ['hangDuration'] },
-  launch: { key: 'launch', icon: '🐢', label: 'Slow Launch',       color: '#f59e0b', fields: ['launchDuration'] },
-  memory: { key: 'memory', icon: '🧠', label: 'Memory Warning',    color: '#8b5cf6', fields: [] },
-  cpu:    { key: 'cpu',    icon: '🔥', label: 'Excess CPU Usage',  color: '#ec4899', fields: ['totalCPUTime', 'totalSampledTime'] },
-  disk:   { key: 'disk',   icon: '💾', label: 'Heavy Disk Write',  color: '#06b6d4', fields: ['writesCaused'] },
+  crash:  { key: 'crash',  icon: '💥', label: 'Crash',            color: '#ef4444' },
+  hang:   { key: 'hang',   icon: '⏱️', label: 'Hang / ANR',        color: '#f59e0b' },
+  launch: { key: 'launch', icon: '🐢', label: 'Slow Launch',       color: '#f59e0b' },
+  memory: { key: 'memory', icon: '🧠', label: 'Memory Warning',    color: '#8b5cf6' },
+  cpu:    { key: 'cpu',    icon: '🔥', label: 'Excess CPU Usage',  color: '#ec4899' },
+  disk:   { key: 'disk',   icon: '💾', label: 'Heavy Disk Write',  color: '#06b6d4' },
 };
+
+// Apple MetricKit diagnostic docs — only shown when eMeta.source says the
+// report actually came from MetricKit (not ANRWatchDog/ForceRestart/etc, and
+// not Android, which has no MetricKit)
+const METRICKIT_DIAGNOSTIC_DOCS = {
+  crash:  { name: 'Crash',                 url: 'https://developer.apple.com/documentation/metrickit/mxcrashdiagnostic' },
+  hang:   { name: 'Hang',                  url: 'https://developer.apple.com/documentation/metrickit/mxhangdiagnostic' },
+  launch: { name: 'App Launch',            url: 'https://developer.apple.com/documentation/metrickit/mxapplaunchdiagnostic' },
+  cpu:    { name: 'CPU Exception',         url: 'https://developer.apple.com/documentation/metrickit/mxcpuexceptiondiagnostic' },
+  disk:   { name: 'Disk Write Exception',  url: 'https://developer.apple.com/documentation/metrickit/mxdiskwriteexceptiondiagnostic' },
+};
+
+// how each non-MetricKit detector gets attributed in the crash summary note —
+// only ones with a real, known doc page get a link; the rest just name the
+// detector with no link rather than pointing at a page that doesn't exist
+function resolveDiagnosticNote(dtype) {
+  const source = crashMetadata && crashMetadata.source;
+
+  if (source === 'MetricKit' && METRICKIT_DIAGNOSTIC_DOCS[dtype.key]) {
+    const doc = METRICKIT_DIAGNOSTIC_DOCS[dtype.key];
+    return {
+      lead: `Blue Triangle tracks Apple MetricKit ${doc.name}Diagnostic reports.`,
+      label: `MetricKit ${doc.name} Diagnostic`,
+      url: doc.url,
+    };
+  }
+  if (source === 'ANRWatchDog') {
+    return { lead: 'Blue Triangle tracks main-thread hangs using an ANR Watchdog.', label: 'BlueTriangle ANR Watchdog', url: null };
+  }
+  if (source === 'ForceRestart') {
+    return { lead: 'Blue Triangle tracks force-restart events reported by the app.', label: 'ForceRestart', url: null };
+  }
+  if (source === 'AppExitInformation') {
+    return { lead: "Blue Triangle tracks app exit events using Android's ApplicationExitInfo.", label: 'AppExitInfo', url: null };
+  }
+  if (dtype.key === 'memory') {
+    return {
+      lead: 'Blue Triangle tracks memory warnings raised by iOS.',
+      label: 'UIApplication.didReceiveMemoryWarning',
+      url: 'https://developer.apple.com/documentation/uikit/responding-to-memory-warnings',
+    };
+  }
+  return null;
+}
 
 function getDiagnosticType(etp) {
   const norm = String(etp || '').toLowerCase();
@@ -117,7 +161,7 @@ function getDiagnosticType(etp) {
   if (norm.includes('memory'))                          return DIAGNOSTIC_TYPES.memory;
   if (norm.includes('cpu'))                             return DIAGNOSTIC_TYPES.cpu;
   if (norm.includes('disk') || norm.includes('write'))  return DIAGNOSTIC_TYPES.disk;
-  return { key: 'generic', icon: '⚠️', label: etp || 'Diagnostic Event', color: '#4f8ef7', fields: [] };
+  return { key: 'generic', icon: '⚠️', label: etp || 'Diagnostic Event', color: '#4f8ef7' };
 }
 
 // ── Platform Detection (from NATIVEAPP.sdkId) ────────────────────────────────
@@ -431,37 +475,24 @@ function renderStackTrace() {
 function getCrashSummaryData() {
   if (!crashMetadata && !crashEvent) return null;
 
-  const dtype       = getDiagnosticType(crashEvent && crashEvent.type);
-  const isCrash      = dtype.key === 'crash';
-  const signal        = crashMetadata ? crashMetadata.signal : null;
-  const signalName    = signal != null ? (SIGNAL_NAMES[signal] || `Signal ${signal}`) : null;
-  const reason         = (crashEvent && crashEvent.message) || (crashMetadata && crashMetadata.title) || dtype.label;
+  const dtype  = getDiagnosticType(crashEvent && crashEvent.type);
+  const reason = (crashEvent && crashEvent.message) || (crashMetadata && crashMetadata.title) || dtype.label;
+  const note   = resolveDiagnosticNote(dtype);
 
-  const heading = isCrash
-    ? `Fatal Exception${signalName ? ': ' + signalName : ''}`
-    : dtype.label;
-
-  const tags = dtype.fields
-    .filter(key => crashMetadata && crashMetadata[key] != null)
-    .map(key => `<span class="tag">${escapeHtml(META_LABELS[key] || key)} <strong>${escapeHtml(crashMetadata[key])}</strong></span>`);
-
-  const platform = getPlatform(currentSdkId);
-  if (platform) {
-    tags.unshift(`<span class="tag">${platform.icon} <strong>${escapeHtml(platform.label)}</strong></span>`);
-  }
-
-  // right after the platform tag, not at the end
-  if (crashMetadata && crashMetadata.source != null) {
-    tags.splice(platform ? 1 : 0, 0, `<span class="tag"><strong>${escapeHtml(crashMetadata.source)}</strong></span>`);
-  }
-
-  return { dtype, heading, reason, tags };
+  return { dtype, reason, note };
 }
 
-function crashSummaryInnerHTML({ dtype, heading, reason, tags }) {
+function crashSummaryInnerHTML({ reason, note }) {
   return `
     ${reason ? `<div class="crash-summary-reason">${escapeHtml(reason)}</div>` : ''}
-    <div class="crash-summary-tags">${tags.join('')}</div>
+    ${note ? `
+      <div class="crash-summary-note">
+        ${escapeHtml(note.lead)} This issue is reported by
+        ${note.url
+          ? `<a href="${note.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(note.label)}</a>`
+          : escapeHtml(note.label)}.
+      </div>
+    ` : ''}
   `;
 }
 
