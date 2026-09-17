@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-17
+- Restored Session ID as the first card in the Error Details modal's left panel.
 - Renamed the Report modal to "Error Details" with a centered pager, replaced the breadcrumb session header with an Events title/count row matching the Threads tab, added Exception Code/Sub Type/Build to the modal's meta panel, tuned crash log column wrapping, and relabeled the main page's App Info panel (AppInfo, Error count, Total Sessions Impacted, Sessions impacted per cent).
 - Moved the detailed App Version/SDK/eMeta panel into the Report modal's left side, added a simplified App Info summary (App Info, Number of Errors, Percentage of Total Errors, Sessions Impacted) to the main page, and expanded the crash log table to match the live portal's columns (BTT Session ID, Traffic Segment, Content Groups/Page Groups, Onload, Session Playback).
 
