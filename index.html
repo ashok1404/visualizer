@@ -121,7 +121,7 @@
             <tr>
               <th>Error Time</th>
               <th>BTT Session ID</th>
-              <th>Report</th>
+              <th>Breadcrumb / Trace</th>
               <th>Traffic Segment</th>
               <th>Content Groups / Page Groups</th>
               <th>Page Name</th>
@@ -142,18 +142,15 @@
        the Report modal -->
   <div id="modalContentHome" style="display:none">
     <div id="breadcrumbGroup">
-      <!-- SESSION HEADER -->
-      <div class="bc-session-header" id="bcSessionHeader">
-        <div class="bc-session-header-text">
-          <div class="bc-session-id" id="bcSessionId"></div>
-          <div class="bc-session-meta" id="bcSessionMeta"></div>
-          <div class="bc-session-region" id="bcSessionRegion"></div>
-        </div>
-        <button class="btn btn-ghost crash-download-btn segment-download-btn" onclick="downloadBreadcrumbReport()">⬇ Export</button>
-      </div>
-
       <!-- TIMELINE -->
       <div class="timeline-wrap" id="timelineWrap">
+        <div class="timeline-header">
+          <div class="timeline-header-left">
+            <span class="timeline-title">Events</span>
+            <span class="result-count" id="resultCount"></span>
+          </div>
+          <button class="btn btn-ghost crash-download-btn segment-download-btn" onclick="downloadBreadcrumbReport()">⬇ Export</button>
+        </div>
         <div class="timeline" id="timeline"></div>
         <div class="empty-state" id="emptyState">
           <div class="empty-state-icon">🔍</div>
@@ -187,7 +184,12 @@
 <div class="modal-overlay" id="reportModal" style="display:none" onclick="if(event.target===this) closeReportModal()">
   <div class="modal-box">
     <div class="modal-header">
-      <span class="modal-title">Crash Report</span>
+      <span class="modal-title">Error Details</span>
+      <div class="crash-log-pager modal-pager">
+        <button class="pager-btn" onclick="stepModalPager(-1)">◀</button>
+        <span class="pager-info" id="modalPagerInfo">1 to 40</span>
+        <button class="pager-btn" onclick="stepModalPager(1)">▶</button>
+      </div>
       <div class="modal-header-actions">
         <button class="modal-close" onclick="closeReportModal()" aria-label="Close">✕</button>
       </div>
@@ -199,8 +201,8 @@
         </div>
         <div class="modal-main-content">
           <div class="view-switch visible" id="modalViewSwitch">
-            <button class="view-tab active" id="modalTabStacktrace" onclick="setModalView('stacktrace')">🧵 Stack Trace</button>
-            <button class="view-tab" id="modalTabBreadcrumb" onclick="setModalView('breadcrumb')">🍞 Breadcrumbs</button>
+            <button class="view-tab active" id="modalTabStacktrace" onclick="setModalView('stacktrace')">Stack Trace</button>
+            <button class="view-tab" id="modalTabBreadcrumb" onclick="setModalView('breadcrumb')">Breadcrumbs</button>
           </div>
           <div id="modalTimelineSlot"></div>
           <div id="modalThreadsSlot" style="display:none"></div>

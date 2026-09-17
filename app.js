@@ -66,9 +66,9 @@ let crashMetadata  = null;
 let currentSdkId   = null;
 let displaySessionId = null; // shared random session id — same value in the breadcrumb header and the crash log's Session column
 // a single payload has no way to know its share of an app's total error/session
-// volume — these are plausible example percentages, in the same spirit as the
+// volume — these are plausible example stats, in the same spirit as the
 // random session id, so the App Info panel matches the portal's layout
-let displayErrorPercentage = null;
+let displaySessionsImpactedCount = null;
 let displaySessionsImpacted = null;
 let nativeAppInfo  = null; // appVersion/sdkVersion/deviceModel — straight from NATIVEAPP, not eMeta
 let threadViewMode = 'text'; // 'cell' (thread cards) or 'text' (raw stack trace preview, default)
@@ -208,20 +208,8 @@ function formatFullDateTime(ts) {
   return `${date} ${time} (${sign}${offH}:${offM})`;
 }
 
-// "3 Sep, 4:20 PM" style — matches the portal's Event Timeline row timestamps
+// "3 Sep, 4:20:15.123 PM" style — matches the portal's Event Timeline row timestamps
 const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function formatShortDateTime(ts) {
-  if (!ts) return '—';
-  const d = new Date(ts);
-  const hours24 = d.getHours();
-  const hours12 = hours24 % 12 || 12;
-  const ampm = hours24 < 12 ? 'AM' : 'PM';
-  const mins = String(d.getMinutes()).padStart(2, '0');
-  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]}, ${hours12}:${mins} ${ampm}`;
-}
-
-// same as formatShortDateTime but with seconds + milliseconds — used for the
-// per-event Event Timeline rows, where that extra precision matters
 function formatEventDateTime(ts) {
   if (!ts) return '—';
   const d = new Date(ts);
@@ -435,25 +423,12 @@ function renderAppInfoPanel() {
     container.appendChild(card);
   };
 
-  if (crashEvent.appInfo != null)    addCard('App Info', crashEvent.appInfo);
-  if (crashEvent.errorCount != null) addCard('Number of Errors', crashEvent.errorCount);
-  addCard('Percentage of Total Errors', displayErrorPercentage);
-  addCard('Sessions Impacted', displaySessionsImpacted);
+  if (crashEvent.appInfo != null)    addCard('AppInfo', crashEvent.appInfo);
+  if (crashEvent.errorCount != null) addCard('Error count', crashEvent.errorCount);
+  addCard('Total Sessions Impacted', displaySessionsImpactedCount);
+  addCard('Sessions impacted per cent', displaySessionsImpacted);
 }
 
-function renderBreadcrumbSessionHeader() {
-  const parts = [
-    formatShortDateTime(crashEvent && crashEvent.time),
-    'Mobile',
-    'Native App',
-    nativeAppInfo && nativeAppInfo.deviceModel,
-  ].filter(Boolean);
-
-  document.getElementById('bcSessionId').textContent = displaySessionId;
-  document.getElementById('bcSessionMeta').textContent = parts.join(' · ');
-  document.getElementById('bcSessionRegion').textContent =
-    (crashMetadata && crashMetadata.regionFormat) || '';
-}
 
 // ── Timeline Rendering ────────────────────────────────────────────────────────
 function renderTimeline() {
@@ -485,6 +460,7 @@ function renderTimeline() {
     container.appendChild(item);
   });
 
+  document.getElementById('resultCount').textContent = sorted.length ? `${sorted.length} events` : '';
   document.getElementById('emptyState').classList.toggle('visible', sorted.length === 0);
 }
 
@@ -773,7 +749,7 @@ function renderPlatformBadge() {
 // appVersion/appBuildVersion are shown explicitly up top (App Version from
 // NATIVEAPP, Build Version right after it) — skip them here so they don't
 // also print a second time from the generic eMeta loop
-const META_GRID_SKIP = new Set(['title', 'signal', 'exceptionCode', 'exceptionType', 'source', 'appVersion', 'appBuildVersion']);
+const META_GRID_SKIP = new Set(['title', 'signal', 'source', 'appVersion', 'appBuildVersion', 'build']);
 
 function renderMetaGrid() {
   const container = document.getElementById('metaGrid');
@@ -789,11 +765,21 @@ function renderMetaGrid() {
     container.appendChild(card);
   };
 
+  // screen/time identify which specific event this report is for —
+  // shown first, separated from the app/device details below
+  if (crashEvent) {
+    if (getLastPageName())       addCard('Screen Name', getLastPageName());
+    if (crashEvent.time != null) addCard('Error Time', formatFullDateTime(crashEvent.time));
+  }
+  container.appendChild(document.createElement('hr')).className = 'meta-separator';
+
   // App Version from NATIVEAPP directly, not eMeta (eMeta may carry its own,
-  // different appVersion, or none of these fields at all) — Build Version
-  // right after it, then the rest of the NATIVEAPP-level fields
+  // different appVersion, or none of these fields at all) — Build right after
+  // it, then the rest of the NATIVEAPP-level fields. Older payloads carry the
+  // build number as eMeta.appBuildVersion, newer ones as eMeta.build
   if (nativeAppInfo && nativeAppInfo.appVersion) addCard('App Version', nativeAppInfo.appVersion);
-  if (crashMetadata && crashMetadata.appBuildVersion != null) addCard('Build Version', crashMetadata.appBuildVersion);
+  const buildValue = crashMetadata && (crashMetadata.build ?? crashMetadata.appBuildVersion);
+  if (buildValue != null) addCard('Build', buildValue);
   if (nativeAppInfo) {
     if (nativeAppInfo.sdkVersion)  addCard('SDK Version', nativeAppInfo.sdkVersion);
     if (nativeAppInfo.deviceModel) addCard('Model', nativeAppInfo.deviceModel);
@@ -900,10 +886,10 @@ function getLastPageName() {
 // side) or just the Threads list (Diagnostic side) — reparents the real,
 // live elements in/out rather than duplicating them, so it's always in sync
 // with whatever's currently rendered, no separate render path to maintain.
-function openReportModal() {
+function openReportModal(view) {
   document.getElementById('modalTimelineSlot').appendChild(document.getElementById('breadcrumbGroup'));
   document.getElementById('modalThreadsSlot').appendChild(document.getElementById('threadsWrap'));
-  setModalView('stacktrace'); // always open on Stack Trace by default
+  setModalView(view === 'breadcrumb' ? 'breadcrumb' : 'stacktrace'); // defaults to Stack Trace
   document.getElementById('reportModal').style.display = 'flex';
 }
 
@@ -920,6 +906,16 @@ function setModalView(view) {
   );
   document.getElementById('modalTimelineSlot').style.display = view === 'breadcrumb' ? '' : 'none';
   document.getElementById('modalThreadsSlot').style.display  = view === 'stacktrace' ? '' : 'none';
+}
+
+// there's only ever one real crash event loaded, so Prev/Next has nothing
+// real to page through — just moves the "N to 40" counter, matching the
+// portal's Error Details pager without pretending to load other errors
+const MODAL_PAGER_TOTAL = 40;
+let modalPagerCurrent = 1;
+function stepModalPager(delta) {
+  modalPagerCurrent = Math.min(MODAL_PAGER_TOTAL, Math.max(1, modalPagerCurrent + delta));
+  document.getElementById('modalPagerInfo').textContent = `${modalPagerCurrent} to ${MODAL_PAGER_TOTAL}`;
 }
 
 function renderCrashLog() {
@@ -943,8 +939,8 @@ function renderCrashLog() {
     <tr>
       <td>${escapeHtml(errorTime)}</td>
       <td class="crash-log-nowrap">👁️ ${session}</td>
-      <td><button class="crash-log-view-link" onclick="openReportModal()">View</button></td>
-      <td>${trafficSegment}</td>
+      <td class="crash-log-compact"><button class="crash-log-view-link" onclick="openReportModal()">View</button></td>
+      <td class="crash-log-nowrap">${trafficSegment}</td>
       <td>${contentGroup}</td>
       <td class="crash-log-nowrap">${pageName}</td>
       <td class="crash-log-compact">${errorCount}</td>
@@ -1086,7 +1082,7 @@ function parseAndRender() {
     currentSdkId   = sdkId;
     nativeAppInfo  = nativeInfo;
     displaySessionId = generateRandomSessionId(SESSION_ID_DIGITS);
-    displayErrorPercentage = generateRandomPercentage(0.5, 10);
+    displaySessionsImpactedCount = Math.floor(Math.random() * 40) + 1;
     displaySessionsImpacted = generateRandomPercentage(0.1, 5);
     renderPlatformBadge();
 
@@ -1098,7 +1094,6 @@ function parseAndRender() {
     renderStackTrace();
 
     if (hasBreadcrumbs) {
-      renderBreadcrumbSessionHeader();
       renderTimeline();
 
       document.getElementById('timelineWrap').classList.add('visible');
@@ -1116,9 +1111,6 @@ function clearAll() {
   document.getElementById('errorMsg').classList.remove('visible');
   document.getElementById('timelineWrap').classList.remove('visible');
   document.getElementById('timeline').innerHTML = '';
-  document.getElementById('bcSessionId').textContent = '';
-  document.getElementById('bcSessionMeta').textContent = '';
-  document.getElementById('bcSessionRegion').textContent = '';
   document.getElementById('filterToolbar').classList.remove('visible');
   document.getElementById('crashSummary').innerHTML = '';
   document.getElementById('appInfoGrid').innerHTML = '';
@@ -1136,7 +1128,7 @@ function clearAll() {
   currentSdkId   = null;
   nativeAppInfo  = null;
   displaySessionId = null;
-  displayErrorPercentage = null;
+  displaySessionsImpactedCount = null;
   displaySessionsImpacted = null;
   renderPlatformBadge();
 }
