@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-09-17
+- Moved the detailed App Version/SDK/eMeta panel into the Report modal's left side, added a simplified App Info summary (App Info, Number of Errors, Percentage of Total Errors, Sessions Impacted) to the main page, and expanded the crash log table to match the live portal's columns (BTT Session ID, Traffic Segment, Content Groups/Page Groups, Onload, Session Playback).
+
 ## 2026-09-16
 - Replaced the crash summary's tag-pill row with a plain, light attribution note under the crash message, naming the detection source (Apple MetricKit diagnostic type, BlueTriangle ANR Watchdog, ForceRestart, or Android AppExitInfo) and linking to the official Apple doc only where one genuinely exists.
 
