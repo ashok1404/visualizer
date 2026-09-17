@@ -98,7 +98,7 @@
     <div class="crash-summary" id="crashSummary"></div>
     <div class="crash-drilldown-grid" id="crashDrilldownGrid" style="display:none">
       <div class="crash-info-panel">
-        <div class="meta-grid" id="metaGrid"></div>
+        <div class="meta-grid" id="appInfoGrid"></div>
       </div>
       <div class="crash-charts-grid" id="crashCharts"></div>
     </div>
@@ -120,11 +120,14 @@
           <thead>
             <tr>
               <th>Error Time</th>
-              <th>Session</th>
+              <th>BTT Session ID</th>
               <th>Report</th>
-              <th>Page Name</th>
               <th>Traffic Segment</th>
-              <th>Number of Errors</th>
+              <th>Content Groups / Page Groups</th>
+              <th>Page Name</th>
+              <th class="crash-log-compact">Number of Errors</th>
+              <th class="crash-log-compact">Onload</th>
+              <th class="crash-log-compact">Session Playback</th>
             </tr>
           </thead>
           <tbody id="crashLogBody"></tbody>
@@ -190,12 +193,19 @@
       </div>
     </div>
     <div class="modal-body">
-      <div class="view-switch visible" id="modalViewSwitch">
-        <button class="view-tab active" id="modalTabStacktrace" onclick="setModalView('stacktrace')">🧵 Stack Trace</button>
-        <button class="view-tab" id="modalTabBreadcrumb" onclick="setModalView('breadcrumb')">🍞 Breadcrumbs</button>
+      <div class="crash-drilldown-grid">
+        <div class="crash-info-panel">
+          <div class="meta-grid" id="metaGrid"></div>
+        </div>
+        <div class="modal-main-content">
+          <div class="view-switch visible" id="modalViewSwitch">
+            <button class="view-tab active" id="modalTabStacktrace" onclick="setModalView('stacktrace')">🧵 Stack Trace</button>
+            <button class="view-tab" id="modalTabBreadcrumb" onclick="setModalView('breadcrumb')">🍞 Breadcrumbs</button>
+          </div>
+          <div id="modalTimelineSlot"></div>
+          <div id="modalThreadsSlot" style="display:none"></div>
+        </div>
       </div>
-      <div id="modalTimelineSlot"></div>
-      <div id="modalThreadsSlot" style="display:none"></div>
     </div>
   </div>
 </div>

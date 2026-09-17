@@ -65,6 +65,11 @@ let stackTraceData = null;
 let crashMetadata  = null;
 let currentSdkId   = null;
 let displaySessionId = null; // shared random session id — same value in the breadcrumb header and the crash log's Session column
+// a single payload has no way to know its share of an app's total error/session
+// volume — these are plausible example percentages, in the same spirit as the
+// random session id, so the App Info panel matches the portal's layout
+let displayErrorPercentage = null;
+let displaySessionsImpacted = null;
 let nativeAppInfo  = null; // appVersion/sdkVersion/deviceModel — straight from NATIVEAPP, not eMeta
 let threadViewMode = 'text'; // 'cell' (thread cards) or 'text' (raw stack trace preview, default)
 
@@ -384,6 +389,7 @@ function parsePayload(raw) {
       time:       parseInt(parsed.time, 10) || null,
       session:    sessionId != null ? String(sessionId) : null,
       errorCount: parsed.eCnt != null ? parseInt(parsed.eCnt, 10) : null,
+      appInfo:    parsed.url || null,
     };
   }
 
@@ -406,6 +412,33 @@ function generateRandomSessionId(digits) {
   let id = String(Math.floor(Math.random() * 9) + 1); // no leading zero
   for (let i = 1; i < digits; i++) id += Math.floor(Math.random() * 10);
   return id;
+}
+
+function generateRandomPercentage(min, max) {
+  return (Math.random() * (max - min) + min).toFixed(2) + '%';
+}
+
+// left-side "App Info" panel on the main page — high-level identity/volume
+// stats, distinct from the detailed App Version/SDK/eMeta panel in the Report modal
+function renderAppInfoPanel() {
+  const container = document.getElementById('appInfoGrid');
+  container.innerHTML = '';
+  if (!crashEvent) return;
+
+  const addCard = (label, value) => {
+    const card = document.createElement('div');
+    card.className = 'meta-card';
+    card.innerHTML = `
+      <div class="meta-label">${escapeHtml(label)}</div>
+      <div class="meta-value">${escapeHtml(value)}</div>
+    `;
+    container.appendChild(card);
+  };
+
+  if (crashEvent.appInfo != null)    addCard('App Info', crashEvent.appInfo);
+  if (crashEvent.errorCount != null) addCard('Number of Errors', crashEvent.errorCount);
+  addCard('Percentage of Total Errors', displayErrorPercentage);
+  addCard('Sessions Impacted', displaySessionsImpacted);
 }
 
 function renderBreadcrumbSessionHeader() {
@@ -464,6 +497,7 @@ function escapeHtml(str) {
 // ── Stack Trace Rendering (Crashlytics-style) ────────────────────────────────
 function renderStackTrace() {
   renderCrashSummary();
+  renderAppInfoPanel();
   renderMetaGrid();
   renderCharts();
   renderCrashLog();
@@ -893,7 +927,7 @@ function renderCrashLog() {
   const pagerInfo = document.getElementById('crashLogPagerInfo');
 
   if (!crashEvent) {
-    body.innerHTML = `<tr><td class="crash-log-empty" colspan="6">No crash data</td></tr>`;
+    body.innerHTML = `<tr><td class="crash-log-empty" colspan="9">No crash data</td></tr>`;
     if (pagerInfo) pagerInfo.textContent = '0 to 0 (0)';
     return;
   }
@@ -902,16 +936,20 @@ function renderCrashLog() {
   const session    = displaySessionId || '—';
   const pageName   = escapeHtml(getLastPageName());
   const trafficSegment = 'ScreenTracker';
+  const contentGroup = trafficSegment; // not tracked by the SDK — mirrors Traffic Segment, same as the portal shows when no separate grouping is configured
   const errorCount = crashEvent.errorCount != null ? crashEvent.errorCount : 1;
 
   body.innerHTML = `
     <tr>
       <td>${escapeHtml(errorTime)}</td>
-      <td>${session}</td>
+      <td class="crash-log-nowrap">👁️ ${session}</td>
       <td><button class="crash-log-view-link" onclick="openReportModal()">View</button></td>
-      <td>${pageName}</td>
       <td>${trafficSegment}</td>
-      <td>${errorCount}</td>
+      <td>${contentGroup}</td>
+      <td class="crash-log-nowrap">${pageName}</td>
+      <td class="crash-log-compact">${errorCount}</td>
+      <td class="crash-log-compact">15 ms</td>
+      <td class="crash-log-compact">N/A</td>
     </tr>
   `;
 
@@ -1048,6 +1086,8 @@ function parseAndRender() {
     currentSdkId   = sdkId;
     nativeAppInfo  = nativeInfo;
     displaySessionId = generateRandomSessionId(SESSION_ID_DIGITS);
+    displayErrorPercentage = generateRandomPercentage(0.5, 10);
+    displaySessionsImpacted = generateRandomPercentage(0.1, 5);
     renderPlatformBadge();
 
     document.getElementById('filterToolbar').classList.add('visible');
@@ -1081,6 +1121,7 @@ function clearAll() {
   document.getElementById('bcSessionRegion').textContent = '';
   document.getElementById('filterToolbar').classList.remove('visible');
   document.getElementById('crashSummary').innerHTML = '';
+  document.getElementById('appInfoGrid').innerHTML = '';
   document.getElementById('metaGrid').innerHTML = '';
   document.getElementById('crashCharts').innerHTML = '';
   document.getElementById('crashDrilldownGrid').style.display = 'none';
@@ -1095,6 +1136,8 @@ function clearAll() {
   currentSdkId   = null;
   nativeAppInfo  = null;
   displaySessionId = null;
+  displayErrorPercentage = null;
+  displaySessionsImpacted = null;
   renderPlatformBadge();
 }
 
