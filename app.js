@@ -765,9 +765,10 @@ function renderMetaGrid() {
     container.appendChild(card);
   };
 
-  // screen/time identify which specific event this report is for —
+  // session/screen/time identify which specific event this report is for —
   // shown first, separated from the app/device details below
   if (crashEvent) {
+    if (displaySessionId)        addCard('Session ID', displaySessionId);
     if (getLastPageName())       addCard('Screen Name', getLastPageName());
     if (crashEvent.time != null) addCard('Error Time', formatFullDateTime(crashEvent.time));
   }
