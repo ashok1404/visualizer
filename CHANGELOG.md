@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-24
+- iOS system libraries (UIKitCore, SwiftUI, CoreFoundation, …) copied from Xcode's iOS DeviceSupport folder can now be uploaded like dSYMs and resolve frames the same way atos does — stripped functions stay unnamed and linker-merged ones show as <deduplicated_symbol> instead of a wrong name.
 - Symbolication now detects stacks sent outermost-first (dyld start at frame 0) so the real crash frame is resolved precisely, dSYM uploads show results without waiting on browser storage, and crash log column headers wrap instead of widening the table.
 - Added iOS dSYM upload and automatic symbolication, Crashlytics-style: upload a `.dSYM` folder, a zipped dSYM, or the bare DWARF binary from the new dSYMs button, and every crash whose frame image UUID (`bId`) matches is symbolicated with Swift/ObjC function names, file:line, and inlined frames — in the Threads view, plain text, crash summary, and exported report. dSYMs are parsed entirely in the browser (Mach-O + DWARF 4/5) and kept in IndexedDB, so they persist across visits; the Threads tab flags app images that still need a dSYM along with the crashed app version/build, the dSYM list shows each dSYM's version (from its Info.plist) next to its UUID, and it warns when an uploaded dSYM is from a different build than the crash.
 
