@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-24
+- Symbolication now detects stacks sent outermost-first (dyld start at frame 0) so the real crash frame is resolved precisely, dSYM uploads show results without waiting on browser storage, and crash log column headers wrap instead of widening the table.
+- Added iOS dSYM upload and automatic symbolication, Crashlytics-style: upload a `.dSYM` folder, a zipped dSYM, or the bare DWARF binary from the new dSYMs button, and every crash whose frame image UUID (`bId`) matches is symbolicated with Swift/ObjC function names, file:line, and inlined frames — in the Threads view, plain text, crash summary, and exported report. dSYMs are parsed entirely in the browser (Mach-O + DWARF 4/5) and kept in IndexedDB, so they persist across visits; the Threads tab flags app images that still need a dSYM along with the crashed app version/build, the dSYM list shows each dSYM's version (from its Info.plist) next to its UUID, and it warns when an uploaded dSYM is from a different build than the crash.
+
 ## 2026-09-17
 - Restored Session ID as the first card in the Error Details modal's left panel.
 - Renamed the Report modal to "Error Details" with a centered pager, replaced the breadcrumb session header with an Events title/count row matching the Threads tab, added Exception Code/Sub Type/Build to the modal's meta panel, tuned crash log column wrapping, and relabeled the main page's App Info panel (AppInfo, Error count, Total Sessions Impacted, Sessions impacted per cent).
