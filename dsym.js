@@ -824,7 +824,9 @@ const DSYM = (() => {
   function list() {
     return Array.from(loaded.values())
       .map(i => ({ uuid: i.uuid, name: i.name, arch: i.arch, uploadedAt: i.uploadedAt, fileName: i.fileName, hasDwarf: i.hasDwarf,
-        appVersion: i.appVersion || null, buildVersion: i.buildVersion || null }))
+        appVersion: i.appVersion || null, buildVersion: i.buildVersion || null,
+        // Apple libraries from iOS DeviceSupport keep their dyld shared cache address (0x180000000 and up)
+        system: i.textVmaddr >= 0x180000000 }))
       .sort((a, b) => b.uploadedAt - a.uploadedAt);
   }
 

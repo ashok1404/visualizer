@@ -1236,12 +1236,23 @@ function renderDsymStatus() {
       </div>
     `);
   }
-  if (symbolicated.length) {
+  // only the app's own dSYMs are listed — Apple system symbols resolve quietly
+  const appSymbolicated = symbolicated.filter(i => !isSystemImage(i.binary, i.address));
+  if (appSymbolicated.length) {
     const dsymVersion = i => { const u = uploaded.find(x => x.uuid === i.uuid); return u ? formatAppVersion(u.appVersion, u.buildVersion) : ''; };
     rows.push(`
       <div class="dsym-status-row is-ok">
         <span class="dsym-status-icon">✓</span>
-        <span class="dsym-status-text">Symbolicated with uploaded dSYM: ${symbolicated.map(i => imageLabel(i, dsymVersion(i))).join(', ')}</span>
+        <span class="dsym-status-text">Symbolicated with uploaded dSYM: ${appSymbolicated.map(i => imageLabel(i, dsymVersion(i))).join(', ')}</span>
+        <button class="btn btn-ghost dsym-status-btn" onclick="openDsymModal()">Upload dSYM</button>
+      </div>
+    `);
+  } else if (!missing.length) {
+    // nothing to report either way — still leave a way into the upload dialog
+    rows.push(`
+      <div class="dsym-status-row is-neutral">
+        <span class="dsym-status-text">Upload dSYMs to symbolicate this crash's app frames.</span>
+        <button class="btn btn-ghost dsym-status-btn" onclick="openDsymModal()">Upload dSYM</button>
       </div>
     `);
   }
@@ -1252,7 +1263,7 @@ function renderDsymStatus() {
 function updateDsymCount() {
   const el = document.getElementById('dsymCount');
   if (!el || typeof DSYM === 'undefined') return;
-  const n = DSYM.list().length;
+  const n = DSYM.list().filter(i => !i.system).length;
   el.textContent = n ? String(n) : '';
   el.style.display = n ? '' : 'none';
 }
@@ -1282,12 +1293,34 @@ function formatUploadDate(ts) {
 function renderDsymList() {
   const el = document.getElementById('dsymList');
   if (!el || typeof DSYM === 'undefined') return;
-  const images = DSYM.list();
+  const all = DSYM.list();
+  const images = all.filter(i => !i.system);
+  const systemImages = all.filter(i => i.system);
+  const inUse = new Set(allFrames().map(f => DSYM.normalizeUUID(f.bId)).filter(Boolean));
+  const removeBtn = img => `<button class="dsym-remove" onclick="removeDsym('${escapeHtml(img.uuid)}')" title="Remove" aria-label="Remove ${escapeHtml(img.name)}">✕</button>`;
+
+  // Apple libraries: one compact line each, collapsed by default — names only, no versions to track
+  const systemSection = systemImages.length ? `
+    <details class="dsym-system">
+      <summary>Apple system symbols <span class="dsym-system-count">${systemImages.length} ${systemImages.length === 1 ? 'library' : 'libraries'}${systemImages.some(i => inUse.has(i.uuid)) ? ` · ${systemImages.filter(i => inUse.has(i.uuid)).length} used by this crash` : ''}</span></summary>
+      <table class="dsym-table">
+        <tbody>
+          ${systemImages.map(img => `
+            <tr>
+              <td class="dsym-binary">${escapeHtml(img.name)}${inUse.has(img.uuid) ? '<span class="dsym-inuse">Used by this crash</span>' : ''}</td>
+              <td class="dsym-uuid">${escapeHtml(img.uuid)}</td>
+              <td>${removeBtn(img)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </details>
+  ` : '';
+
   if (!images.length) {
-    el.innerHTML = `<div class="dsym-empty">No dSYMs uploaded yet</div>`;
+    el.innerHTML = `<div class="dsym-empty">No dSYMs uploaded yet</div>${systemSection}`;
     return;
   }
-  const inUse = new Set(allFrames().map(f => DSYM.normalizeUUID(f.bId)).filter(Boolean));
   el.innerHTML = `
     <table class="dsym-table">
       <thead><tr><th>Binary</th><th>Version</th><th>UUID</th><th>Arch</th><th>Uploaded</th><th></th></tr></thead>
@@ -1303,11 +1336,12 @@ function renderDsymList() {
             <td class="dsym-uuid">${escapeHtml(img.uuid)}</td>
             <td>${escapeHtml(img.arch)}</td>
             <td class="dsym-date">${escapeHtml(formatUploadDate(img.uploadedAt))}</td>
-            <td><button class="dsym-remove" onclick="removeDsym('${escapeHtml(img.uuid)}')" title="Remove dSYM" aria-label="Remove dSYM for ${escapeHtml(img.name)}">✕</button></td>
+            <td>${removeBtn(img)}</td>
           </tr>
         `).join('')}
       </tbody>
     </table>
+    ${systemSection}
   `;
 }
 
@@ -1355,6 +1389,24 @@ async function ingestDsymFiles(entries) {
     setDsymProgress(`Could not read dSYM: ${e.message}`, 'error');
   }
   refreshSymbolication();
+}
+
+// Apple symbols come from Xcode's iOS DeviceSupport folder, which holds
+// thousands of libraries (several GB) — when a crash is loaded, read only the
+// libraries that crash actually uses, so picking the whole folder is fine
+function handleAppleSymbolsInput(input) {
+  const entries = Array.from(input.files || []).map(file => ({ file, path: file.webkitRelativePath || file.name }));
+  input.value = '';
+  const needed = new Set(allFrames()
+    .map(f => parseFrameLine(f.fLine))
+    .filter(p => p.binary && isSystemImage(p.binary, p.address))
+    .map(p => p.binary));
+  const picked = needed.size ? entries.filter(e => needed.has(e.path.split('/').pop())) : entries;
+  if (needed.size && !picked.length) {
+    setDsymProgress(`None of this crash's Apple libraries (${[...needed].join(', ')}) were in that folder.`, 'error');
+    return;
+  }
+  ingestDsymFiles(picked);
 }
 
 function handleDsymInput(input) {

@@ -239,6 +239,16 @@
           <label class="btn btn-ghost">Choose .dSYM folder<input type="file" id="dsymFolderInput" webkitdirectory multiple hidden onchange="handleDsymInput(this)"></label>
         </div>
       </div>
+      <div class="dsym-apple">
+        <div class="dsym-apple-text">
+          <div class="dsym-apple-title">Apple system symbols</div>
+          <div class="dsym-dropzone-hint">
+            Names UIKit, SwiftUI, CoreFoundation and other system frames. Choose the folder for the crash's iOS version from
+            <code>~/Library/Developer/Xcode/iOS DeviceSupport/</code> (or a copy of it) — only the libraries this crash uses are loaded.
+          </div>
+        </div>
+        <label class="btn btn-ghost">Upload Apple symbols<input type="file" id="appleSymbolsInput" webkitdirectory multiple hidden onchange="handleAppleSymbolsInput(this)"></label>
+      </div>
       <div class="dsym-progress" id="dsymProgress" role="status"></div>
       <div id="dsymList"></div>
     </div>
