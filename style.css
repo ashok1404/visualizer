@@ -1099,7 +1099,7 @@ textarea::placeholder { color: var(--text-muted); }
   white-space: nowrap;
 }
 
-.frame-row-inlined { padding-top: 0; padding-bottom: 0; opacity: 0.8; }
+.frame-inlined { color: var(--text-muted); flex-basis: 100%; }
 .frame-inlined-tag {
   font-size: 10px;
   text-transform: uppercase;

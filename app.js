@@ -534,12 +534,8 @@ function formatFrames(frames) {
     if (!binary && !address) return `${String(frame.i).padStart(3)}  ${symbol}`;
     const prefix = `${String(frame.i).padStart(3)}  ${binary.padEnd(30)} ${address}  `;
     if (!sym) return prefix + symbol;
-    // Xcode's symbolicated-log layout: inlined functions get their own line
-    // at the same address, innermost first, tagged [inlined]
-    return [
-      ...sym.inlined.map(inl => `${prefix}${symbolicatedText(inl)} [inlined]`),
-      prefix + symbolicatedText(sym),
-    ].join('\n');
+    // one line per address — innermost (inlined) function first, what it was inlined into in brackets
+    return prefix + frameText(sym);
   }).join('\n');
 }
 
@@ -985,30 +981,19 @@ function renderFrameRow(frame) {
     `;
   }
 
-  // inlined functions sit above the concrete one (innermost first, like the
-  // rest of the stack) and share its index/binary/address
-  const symbolCell = s => `
-    <span class="frame-symbol frame-symbolicated" title="${escapeHtml(symbol)}${s.file ? `\n${escapeHtml(s.file)}` : ''}">
-      <span class="frame-func">${escapeHtml(s.func || '???')}</span>
-      ${s.file ? `<span class="frame-loc">${escapeHtml(frameLocation(s))}</span>` : ''}
-    </span>
-  `;
-  const inlinedRows = sym.inlined.map(inl => `
-    <div class="frame-row frame-row-inlined">
-      <span class="frame-index"></span>
-      <span class="frame-binary"></span>
-      <span class="frame-address"><span class="frame-inlined-tag">inlined</span></span>
-      ${symbolCell(inl)}
-    </div>
-  `).join('');
-
+  // one row per address: the innermost (inlined) function first — that's
+  // where execution actually was — and what it was inlined into beneath it
+  const { top, into } = frameParts(sym);
   return `
-    ${inlinedRows}
     <div class="frame-row">
       <span class="frame-index">${frame.i}</span>
       <span class="frame-binary">${escapeHtml(binary)}</span>
       <span class="frame-address">${escapeHtml(address)}</span>
-      ${symbolCell(sym)}
+      <span class="frame-symbol frame-symbolicated" title="${escapeHtml(symbol)}${top.file ? `\n${escapeHtml(top.file)}` : ''}">
+        <span class="frame-func">${escapeHtml(top.func || '???')}</span>
+        ${top.file ? `<span class="frame-loc">${escapeHtml(frameLocation(top))}</span>` : ''}
+        ${into.length ? `<span class="frame-inlined"><span class="frame-inlined-tag">inlined into</span> ${escapeHtml(into.map(symbolicatedText).join(' → '))}</span>` : ''}
+      </span>
     </div>
   `;
 }
@@ -1170,6 +1155,19 @@ function symbolicatedText(s) {
   return `${s.func || '???'}${loc ? ` (${loc})` : ''}`;
 }
 
+// sym.inlined is innermost-first; the innermost function is where execution
+// actually was, so it leads, followed by each function it was inlined into
+// (outward, ending with the real, non-inlined function)
+function frameParts(sym) {
+  const chain = [...(sym.inlined || []), sym];
+  return { top: chain[0], into: chain.slice(1) };
+}
+
+function frameText(sym) {
+  const { top, into } = frameParts(sym);
+  return `${symbolicatedText(top)}${into.length ? ` [inlined into ${into.map(symbolicatedText).join(' → ')}]` : ''}`;
+}
+
 function allFrames() {
   const threads = stackTraceData && stackTraceData.threads ? stackTraceData.threads : [];
   return threads.flatMap(t => t.stack || []);
@@ -1186,7 +1184,7 @@ function symbolicateMessage(text) {
     const match = frames.find(f => f.bId && parseFrameLine(f.fLine).address.toLowerCase() === parts.address.toLowerCase());
     if (!match) return line;
     const { sym } = resolveFrame(match);
-    return sym ? `${parts.binary}  ${parts.address}  ${symbolicatedText(sym)}` : line;
+    return sym ? `${parts.binary}  ${parts.address}  ${frameText(sym)}` : line;
   }).join('\n');
 }
 
@@ -1222,19 +1220,19 @@ function renderDsymStatus() {
   const imageLabel = (i, version) => `<span class="dsym-status-image">${escapeHtml(i.binary)}</span>${versionTag(version)} <span class="dsym-status-uuid">${escapeHtml(i.uuid || '')}</span>`;
   const neededVersion = crashAppVersion();
   const rows = [];
+  // a missing dSYM is the only thing worth saying — nothing about other uploaded dSYMs
   if (missing.length) {
-    // same binary uploaded, but from another build — the most common reason a dSYM "doesn't work"
-    const otherBuilds = missing.flatMap(i => uploaded.filter(u => u.name === i.binary && u.uuid !== i.uuid));
-    rows.push(`
+    el.innerHTML = `
       <div class="dsym-status-row is-missing">
         <span class="dsym-status-icon">⚠</span>
         <span class="dsym-status-text">
           Missing dSYM${missing.length > 1 ? 's' : ''}${neededVersion ? ` for app version <strong>${escapeHtml(neededVersion)}</strong>` : ''} — upload to symbolicate: ${missing.map(i => imageLabel(i)).join(', ')}
-          ${otherBuilds.length ? `<span class="dsym-status-hint">Uploaded ${otherBuilds.map(u => `${escapeHtml(u.name)}${versionTag(formatAppVersion(u.appVersion, u.buildVersion))} (${escapeHtml(u.uuid)})`).join(', ')} ${otherBuilds.length > 1 ? 'are' : 'is'} from a different build — the UUID must match.</span>` : ''}
         </span>
         <button class="btn btn-ghost dsym-status-btn" onclick="openDsymModal()">Upload dSYM</button>
       </div>
-    `);
+    `;
+    el.style.display = '';
+    return;
   }
   // only the app's own dSYMs are listed — Apple system symbols resolve quietly
   const appSymbolicated = symbolicated.filter(i => !isSystemImage(i.binary, i.address));
@@ -1247,7 +1245,7 @@ function renderDsymStatus() {
         <button class="btn btn-ghost dsym-status-btn" onclick="openDsymModal()">Upload dSYM</button>
       </div>
     `);
-  } else if (!missing.length) {
+  } else {
     // nothing to report either way — still leave a way into the upload dialog
     rows.push(`
       <div class="dsym-status-row is-neutral">
