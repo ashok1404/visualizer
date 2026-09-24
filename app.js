@@ -359,6 +359,8 @@ function parsePayload(raw) {
     appVersion:  nativeApp.appVersion  || null,
     sdkVersion:  nativeApp.sdkVersion  || null,
     deviceModel: nativeApp.deviceModel || null,
+    netState:    nativeApp.netState    || null,
+    netStateSource: nativeApp.netStateSource || null,
   };
 
   // session id shows up under a few different names depending on SDK/version —
@@ -558,26 +560,101 @@ function extraMetadataLines(usedKeys) {
     });
 }
 
+// Mach exception types (<mach/exception_types.h>) — eMeta.exceptionType carries the number
+const MACH_EXCEPTION_NAMES = {
+  1: 'EXC_BAD_ACCESS', 2: 'EXC_BAD_INSTRUCTION', 3: 'EXC_ARITHMETIC', 4: 'EXC_EMULATION',
+  5: 'EXC_SOFTWARE', 6: 'EXC_BREAKPOINT', 7: 'EXC_SYSCALL', 8: 'EXC_MACH_SYSCALL',
+  9: 'EXC_RPC_ALERT', 10: 'EXC_CRASH', 11: 'EXC_RESOURCE', 12: 'EXC_GUARD', 13: 'EXC_CORPSE_NOTIFY',
+};
+
+// "2026-09-24 16:16:00.000 +0530" — the local-time format Apple crash logs use
+function formatAppleDateTime(ts) {
+  const d = new Date(ts);
+  const p = (n, w = 2) => String(n).padStart(w, '0');
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)} ` +
+    `${sign}${p(Math.floor(Math.abs(off) / 60))}${p(Math.abs(off) % 60)}`;
+}
+
+// load address of each image, recovered from its frames ("0xADDR Binary + offset"
+// means the image starts at ADDR − offset) — the Binary Images section Apple
+// crash logs end with, which other symbolication tools read UUIDs from
+function binaryImages() {
+  const images = new Map();
+  allFrames().forEach(frame => {
+    const { binary, address, symbol } = parseFrameLine(frame.fLine);
+    const m = String(symbol).match(/\+\s*(\d+)\s*$/);
+    const uuid = frame.bId && typeof DSYM !== 'undefined' ? DSYM.normalizeUUID(frame.bId) : frame.bId;
+    if (!binary || !address || !m || !uuid || images.has(uuid)) return;
+    images.set(uuid, { binary, uuid, load: parseInt(address, 16) - parseInt(m[1], 10) });
+  });
+  return [...images.values()].sort((a, b) => a.load - b.load);
+}
+
+// the app's own executable — first non-system image in the stack
+function appProcessName() {
+  const img = binaryImages().find(i => !isSystemImage(i.binary, '0x' + i.load.toString(16)));
+  return img ? img.binary : null;
+}
+
 // Apple crash-log style — https://developer.apple.com/documentation/xcode/analyzing-a-crash-report
+// header fields in Apple's order and wording, filled only from what the payload carries
 function buildIOSCrashText(f) {
+  const m = crashMetadata || {};
+  const info = nativeAppInfo || {};
   const lines = [];
-  if (crashMetadata && crashMetadata.deviceType)        lines.push(`Hardware Model:      ${crashMetadata.deviceType}`);
-  if (f.version)                                        lines.push(`Version:             ${f.version}`);
-  if (crashMetadata && crashMetadata.platformArchitecture) lines.push(`Code Type:           ${crashMetadata.platformArchitecture}`);
-  if (crashMetadata && crashMetadata.osVersion)         lines.push(`OS Version:          ${crashMetadata.osVersion}`);
-  lines.push(...extraMetadataLines(new Set(['title', 'appVersion', 'appBuildVersion', 'osVersion', 'deviceType', 'platformArchitecture', 'signal'])));
+  const field = (label, value) => { if (value != null && value !== '') lines.push(`${(label + ':').padEnd(21)}${value}`); };
+  const yesNo = v => (v == null ? null : (v === true || v === 'true' ? 'YES' : 'NO'));
+
+  const build = m.build ?? m.appBuildVersion;
+  const version = info.appVersion || m.appVersion;
+  const arch = m.arch || m.platformArchitecture;
+
+  field('Hardware Model', info.deviceModel || m.deviceType);
+  field('Process', appProcessName());
+  field('Version', version ? `${version}${build != null ? ` (${build})` : ''}` : (build != null ? `(${build})` : null));
+  field('Beta', m.isTestFlightApp != null ? `${yesNo(m.isTestFlightApp)}${yesNo(m.isTestFlightApp) === 'YES' ? ' (TestFlight)' : ''}` : null);
+  field('Code Type', arch ? (/^arm64/.test(arch) ? `ARM-64 (${arch})` : arch) : null);
+  if (crashEvent && crashEvent.time) field('Date/Time', formatAppleDateTime(crashEvent.time));
+  field('OS Version', m.osVersion);
   lines.push('');
-  lines.push(`Exception Type:  ${f.signalName || f.dtype.label}`);
-  if (f.reason) lines.push(`Exception Note:  ${f.reason}`);
+
+  // Blue Triangle context — not part of Apple's header, but carried by the payload
+  field('Diagnostic Source', m.source);
+  field('Region', m.regionFormat);
+  field('Low Power Mode', yesNo(m.lowPowerModeEnabled));
+  lines.push(...extraMetadataLines(new Set(['title', 'appVersion', 'appBuildVersion', 'build', 'osVersion', 'deviceType',
+    'platformArchitecture', 'arch', 'platform', 'signal', 'exceptionType', 'exceptionCode', 'isTestFlightApp',
+    'source', 'regionFormat', 'lowPowerModeEnabled'])).map(l => { const [k, ...v] = l.split(': '); return `${(k + ':').padEnd(21)}${v.join(': ')}`; }));
+  lines.push('');
+
+  const mach = m.exceptionType != null ? (MACH_EXCEPTION_NAMES[m.exceptionType] || `EXC_${m.exceptionType}`) : null;
+  const exceptionType = mach ? `${mach}${f.signalName ? ` (${f.signalName})` : ''}` : (f.signalName || f.dtype.label);
+  lines.push(`Exception Type:  ${exceptionType}`);
+  if (m.exceptionCode != null) lines.push(`Exception Codes: 0x${Number(m.exceptionCode).toString(16).padStart(16, '0')}`);
+  const note = f.reason ? String(f.reason).split('\n')[0] : null;
+  if (note) lines.push(`Exception Note:  ${note}`);
   if (f.crashedThread) lines.push(`Triggered by Thread:  ${f.crashedThread.id}`);
   lines.push('');
 
   f.threads.forEach(thread => {
-    const label = threadLabel(thread);
-    lines.push(thread.crashed ? `Thread ${thread.id} Crashed${label}` : `Thread ${thread.id}${label}`);
+    // Apple gives the name its own line, then "Thread N Crashed:" / "Thread N:"
+    if (threadLabel(thread)) lines.push(`Thread ${thread.id} name:  ${thread.name}`);
+    lines.push(thread.crashed ? `Thread ${thread.id} Crashed:` : `Thread ${thread.id}:`);
     lines.push(formatFrames(thread.stack || []));
     lines.push('');
   });
+
+  const images = binaryImages();
+  if (images.length) {
+    const imgArch = arch || 'arm64';
+    lines.push('Binary Images:');
+    images.forEach(i => {
+      const uuid = i.uuid.replace(/-/g, '').toLowerCase();
+      lines.push(`${('0x' + i.load.toString(16)).padStart(18)} - ${'???'.padStart(18)} ${i.binary} ${imgArch}  <${uuid}>`);
+    });
+  }
 
   return lines.join('\n').trim();
 }
@@ -668,6 +745,9 @@ function buildCrashReportText() {
     case 'React Native':  body = buildReactNativeCrashText(f); break;
     default:              body = buildGenericCrashText(f);
   }
+
+  // iOS reports carry their own Apple-style header (with Date/Time) — no generic one on top
+  if (platformLabel === 'iOS') return body + '\n';
 
   const header = [`Platform:      ${platformLabel}`];
   if (crashEvent && crashEvent.time) header.push(`Date/Time:     ${new Date(crashEvent.time).toISOString()}`);
