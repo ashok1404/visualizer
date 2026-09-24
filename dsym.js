@@ -113,6 +113,8 @@ const DSYM = (() => {
       const cmd = dv.getUint32(pos, true), cmdsize = dv.getUint32(pos + 4, true);
       if (cmd === 0x1b) { // LC_UUID
         slice.uuid = formatUUID(bytes.subarray(pos + 8, pos + 24));
+      } else if (cmd === 0x26) { // LC_FUNCTION_STARTS
+        slice.functionStarts = { dataoff: dv.getUint32(pos + 8, true), datasize: dv.getUint32(pos + 12, true) };
       } else if (cmd === 0x2) { // LC_SYMTAB
         slice.symtab = { symoff: dv.getUint32(pos + 8, true), nsyms: dv.getUint32(pos + 12, true), stroff: dv.getUint32(pos + 16, true), strsize: dv.getUint32(pos + 20, true) };
       } else if (cmd === 0x19 || cmd === 0x1) { // LC_SEGMENT_64 / LC_SEGMENT
@@ -541,8 +543,27 @@ const DSYM = (() => {
     return out;
   }
 
+  // LC_FUNCTION_STARTS: every function's start, named or not, as ULEB deltas
+  // from __TEXT. dSYMs strip this data (the offsets point past the file), and
+  // DWARF covers them anyway, so an empty list is normal there.
+  function readFunctionStarts(slice) {
+    const fs = slice.functionStarts;
+    if (!fs || !fs.datasize || fs.dataoff + fs.datasize > slice.bytes.length) return new Uint32Array(0);
+    const r = new Reader(slice.bytes, fs.dataoff);
+    const end = fs.dataoff + fs.datasize;
+    const out = [];
+    let off = 0;
+    while (r.pos < end) {
+      const delta = r.uleb();
+      if (!delta) break;
+      off += delta;
+      out.push(off);
+    }
+    return new Uint32Array(out);
+  }
+
   // ── Index build ────────────────────────────────────────────────────────────
-  const INDEX_VERSION = 2;
+  const INDEX_VERSION = 3;
   const NO_FILE = 0xffffffff, END_SEQ = 0xfffffffe;
 
   // turns nested (possibly overlapping) code ranges into flat, sorted,
@@ -661,6 +682,7 @@ const DSYM = (() => {
       chains: new Uint32Array(chainData),
       lines,
       syms,
+      funcStarts: readFunctionStarts(slice),
       hasDwarf: funcs.length > 0 || lines.length > 0,
       uploadedAt: Date.now(),
     };
@@ -736,7 +758,22 @@ const DSYM = (() => {
     if (si < 0) return null;
     // symbols carry no size; the next symbol's start bounds this one
     const next = si + 1 < index.syms.length / 2 ? index.syms[(si + 1) * 2] : (index.textEnd || Infinity);
-    return off < next ? demangle(index.strings[index.syms[si * 2 + 1]]) : null;
+    if (off >= next) return null;
+    // system libraries pulled from the dyld shared cache have many local
+    // symbols stripped — if an unnamed function starts between the nearest
+    // symbol and this address, that symbol isn't ours; leave the frame
+    // unnamed (as atos does) rather than show the wrong function
+    const starts = index.funcStarts;
+    if (starts && starts.length) {
+      const fi = bsearch(starts, 1, off);
+      if (fi >= 0 && starts[fi] > index.syms[si * 2]) return null;
+    }
+    // identical functions folded by the linker share one address under several
+    // names — there's no telling which one ran, so say so (as atos/Xcode do)
+    const at = index.syms[si * 2], name = index.syms[si * 2 + 1];
+    const sameAt = k => k >= 0 && k < index.syms.length / 2 && index.syms[k * 2] === at && index.syms[k * 2 + 1] !== name;
+    if (sameAt(si - 1) || sameAt(si + 1)) return '<deduplicated_symbol>';
+    return demangle(index.strings[name]);
   }
 
   // ── Persistence (IndexedDB) ────────────────────────────────────────────────
