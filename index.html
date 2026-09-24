@@ -17,6 +17,9 @@
     <p>Error Report Inspector</p>
   </div>
   <div class="platform-badge" id="platformBadge"></div>
+  <button class="btn btn-ghost dsym-header-btn" onclick="openDsymModal()" title="Upload dSYMs to symbolicate iOS crashes">
+    dSYMs <span class="dsym-count" id="dsymCount" style="display:none"></span>
+  </button>
   <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Switch theme" aria-label="Switch between light and dark mode">
     <span id="themeIcon">🌙</span>
   </button>
@@ -173,6 +176,7 @@
           <button class="btn btn-ghost crash-download-btn segment-download-btn" onclick="downloadCrashReport()">⬇ Export</button>
         </div>
       </div>
+      <div class="dsym-status" id="dsymStatus" style="display:none"></div>
       <div id="threadsList"></div>
       <pre class="crash-raw-text" id="threadsTextView" style="display:none"></pre>
     </div>
@@ -212,6 +216,37 @@
   </div>
 </div>
 
+<!-- dSYM MODAL -->
+<div class="modal-overlay" id="dsymModal" style="display:none" onclick="if(event.target===this) closeDsymModal()">
+  <div class="modal-box dsym-modal-box">
+    <div class="modal-header dsym-modal-header">
+      <span class="modal-title">dSYM Files</span>
+      <div class="modal-header-actions">
+        <button class="modal-close" onclick="closeDsymModal()" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p class="dsym-intro">
+        Upload the dSYM for each build you ship. Crashes whose image UUID matches an uploaded dSYM are
+        symbolicated automatically — function names, file and line — for every payload you load in this browser.
+        Files are processed locally and never leave your machine.
+      </p>
+      <div class="dsym-dropzone" id="dsymDropZone">
+        <div class="dsym-dropzone-title">Drop a <code>.dSYM</code> folder, a zipped dSYM, or the DWARF binary here</div>
+        <div class="dsym-dropzone-hint">From Xcode: Organizer → Archives → Show in Finder → Show Package Contents → dSYMs</div>
+        <div class="dsym-dropzone-actions">
+          <label class="btn btn-primary">Choose .zip / file<input type="file" id="dsymFileInput" multiple hidden onchange="handleDsymInput(this)"></label>
+          <label class="btn btn-ghost">Choose .dSYM folder<input type="file" id="dsymFolderInput" webkitdirectory multiple hidden onchange="handleDsymInput(this)"></label>
+        </div>
+      </div>
+      <div class="dsym-progress" id="dsymProgress" role="status"></div>
+      <div id="dsymList"></div>
+    </div>
+  </div>
+</div>
+
+<script src="swift-demangle.js"></script>
+<script src="dsym.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

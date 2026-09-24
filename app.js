@@ -486,7 +486,7 @@ function getCrashSummaryData() {
   if (!crashMetadata && !crashEvent) return null;
 
   const dtype  = getDiagnosticType(crashEvent && crashEvent.type);
-  const reason = (crashEvent && crashEvent.message) || (crashMetadata && crashMetadata.title) || dtype.label;
+  const reason = symbolicateMessage((crashEvent && crashEvent.message) || (crashMetadata && crashMetadata.title) || dtype.label);
   const note   = resolveDiagnosticNote(dtype);
 
   return { dtype, reason, note };
@@ -515,7 +515,7 @@ function getReportFields() {
   const dtype      = getDiagnosticType(crashEvent && crashEvent.type);
   const signal     = crashMetadata ? crashMetadata.signal : null;
   const signalName = signal != null ? (SIGNAL_NAMES[signal] || `Signal ${signal}`) : null;
-  const reason     = (crashEvent && crashEvent.message) || (crashMetadata && crashMetadata.title) || dtype.label;
+  const reason     = symbolicateMessage((crashEvent && crashEvent.message) || (crashMetadata && crashMetadata.title) || dtype.label);
   const version    = crashMetadata && crashMetadata.appVersion
     ? crashMetadata.appVersion + (crashMetadata.appBuildVersion ? ` (${crashMetadata.appBuildVersion})` : '')
     : null;
@@ -528,11 +528,18 @@ function getReportFields() {
 function formatFrames(frames) {
   if (!frames.length) return '(no frames)';
   return frames.map(frame => {
-    const { binary, address, symbol } = parseFrameLine(frame.fLine);
+    const { binary, address, symbol, sym } = resolveFrame(frame);
     // no binary/address to show (Android/RN-style frames) — skip that column
     // instead of padding it out, which would leave a big gap before the symbol
     if (!binary && !address) return `${String(frame.i).padStart(3)}  ${symbol}`;
-    return `${String(frame.i).padStart(3)}  ${binary.padEnd(30)} ${address}  ${symbol}`;
+    const prefix = `${String(frame.i).padStart(3)}  ${binary.padEnd(30)} ${address}  `;
+    if (!sym) return prefix + symbol;
+    // Xcode's symbolicated-log layout: inlined functions get their own line
+    // at the same address, innermost first, tagged [inlined]
+    return [
+      ...sym.inlined.map(inl => `${prefix}${symbolicatedText(inl)} [inlined]`),
+      prefix + symbolicatedText(sym),
+    ].join('\n');
   }).join('\n');
 }
 
@@ -954,7 +961,7 @@ function renderCrashLog() {
 }
 
 function renderFrameRow(frame) {
-  const { binary, address, symbol } = parseFrameLine(frame.fLine);
+  const { binary, address, symbol, sym } = resolveFrame(frame);
 
   // no binary/address to show (Android/RN-style frames) — skip those columns
   // instead of leaving them empty, which would leave a big gap before the symbol
@@ -967,12 +974,41 @@ function renderFrameRow(frame) {
     `;
   }
 
+  if (!sym) {
+    return `
+      <div class="frame-row">
+        <span class="frame-index">${frame.i}</span>
+        <span class="frame-binary">${escapeHtml(binary)}</span>
+        <span class="frame-address">${escapeHtml(address)}</span>
+        <span class="frame-symbol">${escapeHtml(symbol)}</span>
+      </div>
+    `;
+  }
+
+  // inlined functions sit above the concrete one (innermost first, like the
+  // rest of the stack) and share its index/binary/address
+  const symbolCell = s => `
+    <span class="frame-symbol frame-symbolicated" title="${escapeHtml(symbol)}${s.file ? `\n${escapeHtml(s.file)}` : ''}">
+      <span class="frame-func">${escapeHtml(s.func || '???')}</span>
+      ${s.file ? `<span class="frame-loc">${escapeHtml(frameLocation(s))}</span>` : ''}
+    </span>
+  `;
+  const inlinedRows = sym.inlined.map(inl => `
+    <div class="frame-row frame-row-inlined">
+      <span class="frame-index"></span>
+      <span class="frame-binary"></span>
+      <span class="frame-address"><span class="frame-inlined-tag">inlined</span></span>
+      ${symbolCell(inl)}
+    </div>
+  `).join('');
+
   return `
+    ${inlinedRows}
     <div class="frame-row">
       <span class="frame-index">${frame.i}</span>
       <span class="frame-binary">${escapeHtml(binary)}</span>
       <span class="frame-address">${escapeHtml(address)}</span>
-      <span class="frame-symbol">${escapeHtml(symbol)}</span>
+      ${symbolCell(sym)}
     </div>
   `;
 }
@@ -1007,6 +1043,7 @@ function renderThreads() {
 
   const threads = stackTraceData && stackTraceData.threads ? stackTraceData.threads : [];
   wrap.style.display = '';
+  renderDsymStatus();
   document.getElementById('stackViewToggle').style.display = threads.length ? '' : 'none';
   document.getElementById('threadsTextView').textContent   = threads.length ? buildThreadsText() : 'No stack trace found';
   document.getElementById('threadCount').textContent = threads.length ? `${threads.length} threads` : '';
@@ -1052,6 +1089,325 @@ function renderThreads() {
   });
 
   applyThreadViewMode();
+}
+
+// ── dSYM Symbolication ───────────────────────────────────────────────────────
+// uploaded dSYMs live in IndexedDB (see dsym.js) keyed by image UUID; every
+// frame whose bId matches one gets its "Binary + offset" replaced with the
+// function name and file:line, in the Threads view, plain text, and exports.
+
+// Apple's own frameworks/dylibs — no customer ships a dSYM for these, so
+// they're never reported as missing (Crashlytics treats them the same way).
+// on arm64 iOS they all load from the dyld shared cache at 0x180000000 and up,
+// while app binaries/embedded frameworks load near 0x100000000 — the address
+// catches system images this name list doesn't know about.
+const SHARED_CACHE_BASE = 0x180000000;
+const SYSTEM_IMAGES = new Set([
+  'dyld', 'UIKitCore', 'UIKit', 'Foundation', 'CoreFoundation', 'GraphicsServices', 'SwiftUI', 'SwiftUICore',
+  'UpdateCycle', 'CFNetwork', 'QuartzCore', 'CoreGraphics', 'AttributeGraph', 'WebKit', 'JavaScriptCore',
+  'Combine', 'CoreData', 'MetricKit', 'CoreText', 'FrontBoardServices', 'BaseBoard', 'RunningBoardServices',
+  'BoardServices', 'CoreMotion', 'AVFoundation', 'Network', 'Security', 'CoreServices', 'SpringBoardServices',
+  'CoreAutoLayout', 'ImageIO', 'CoreImage', 'Metal', 'CoreLocation', 'MapKit', 'UserNotifications',
+  'AudioToolbox', 'MediaToolbox', 'CoreMedia', 'CoreVideo', 'IOKit', 'Accessibility', 'CoreUI', 'TextInput',
+  'UIFoundation', 'DocumentManager', 'ContactsFoundation', 'ExtensionFoundation', 'Observation',
+]);
+
+function isSystemImage(binary, address) {
+  return parseInt(address, 16) >= SHARED_CACHE_BASE || /^lib(system_|swift|objc|dispatch|dyld|c\+\+)/.test(binary) || SYSTEM_IMAGES.has(binary);
+}
+
+// "3.15.14 (1)" — app version plus build, whichever of the two is known
+function formatAppVersion(version, build) {
+  if (version && build) return `${version} (${build})`;
+  return version || (build ? `build ${build}` : '');
+}
+
+// version/build of the crashed app, as the payload reports it (same sources as the meta grid)
+function crashAppVersion() {
+  const version = (nativeAppInfo && nativeAppInfo.appVersion) || (crashMetadata && crashMetadata.appVersion) || null;
+  const build = crashMetadata ? (crashMetadata.build ?? crashMetadata.appBuildVersion ?? null) : null;
+  return formatAppVersion(version, build != null ? String(build) : null);
+}
+
+// the frame holding the actual PC (looked up as-is, every other frame is a
+// return address). Apple order puts it first, but the SDK can send stacks
+// outermost-first — dyld's start / libsystem_pthread's thread start at
+// index 0 — in which case it's the last frame instead.
+const OUTERMOST_IMAGES = new Set(['dyld', 'libsystem_pthread.dylib']);
+let leafFrames = new WeakSet(), leafFramesFor = null;
+
+function isLeafFrame(frame) {
+  if (leafFramesFor !== stackTraceData) {
+    leafFrames = new WeakSet();
+    leafFramesFor = stackTraceData;
+    ((stackTraceData && stackTraceData.threads) || []).forEach(t => {
+      const stack = t.stack || [];
+      if (!stack.length) return;
+      const first = parseFrameLine(stack[0].fLine).binary;
+      const last = parseFrameLine(stack[stack.length - 1].fLine).binary;
+      const reversed = stack.length > 1 && OUTERMOST_IMAGES.has(first) && !OUTERMOST_IMAGES.has(last);
+      leafFrames.add(reversed ? stack[stack.length - 1] : stack[0]);
+    });
+  }
+  return leafFrames.has(frame);
+}
+
+function resolveFrame(frame) {
+  const parts = parseFrameLine(frame.fLine);
+  if (!parts.binary || !frame.bId || typeof DSYM === 'undefined') return parts;
+  const sym = DSYM.symbolicate(frame.bId, parts.binary, parts.symbol, isLeafFrame(frame));
+  return sym ? { ...parts, sym } : parts;
+}
+
+function frameLocation(s) {
+  if (!s.file) return '';
+  const name = s.file.split('/').pop();
+  return s.line ? `${name}:${s.line}` : name;
+}
+
+function symbolicatedText(s) {
+  const loc = frameLocation(s);
+  return `${s.func || '???'}${loc ? ` (${loc})` : ''}`;
+}
+
+function allFrames() {
+  const threads = stackTraceData && stackTraceData.threads ? stackTraceData.threads : [];
+  return threads.flatMap(t => t.stack || []);
+}
+
+// the crash message repeats the identifying frame after "~~" (no bId there) —
+// borrow the bId/index from the matching stack frame so it reads the same
+function symbolicateMessage(text) {
+  if (!text || typeof DSYM === 'undefined') return text;
+  const frames = allFrames();
+  return String(text).split('\n').map(line => {
+    const parts = parseFrameLine(line.trim());
+    if (!parts.address) return line;
+    const match = frames.find(f => f.bId && parseFrameLine(f.fLine).address.toLowerCase() === parts.address.toLowerCase());
+    if (!match) return line;
+    const { sym } = resolveFrame(match);
+    return sym ? `${parts.binary}  ${parts.address}  ${symbolicatedText(sym)}` : line;
+  }).join('\n');
+}
+
+// per-image summary of the loaded stack: which app images were symbolicated,
+// and which still need a dSYM uploaded
+function dsymImageSummary() {
+  const images = new Map();
+  allFrames().forEach(frame => {
+    const { binary, address, sym } = resolveFrame(frame);
+    if (!binary || !frame.bId) return;
+    const uuid = DSYM.normalizeUUID(frame.bId);
+    const key = `${binary}|${uuid}`;
+    if (!images.has(key)) images.set(key, { binary, uuid, address, frames: 0, symbolicated: 0 });
+    const img = images.get(key);
+    img.frames++;
+    if (sym) img.symbolicated++;
+  });
+  const list = [...images.values()];
+  return {
+    symbolicated: list.filter(i => i.symbolicated > 0),
+    missing: list.filter(i => i.symbolicated === 0 && !isSystemImage(i.binary, i.address) && !DSYM.has(i.uuid)),
+  };
+}
+
+function renderDsymStatus() {
+  const el = document.getElementById('dsymStatus');
+  if (!el) return;
+  if (typeof DSYM === 'undefined' || !allFrames().some(f => f.bId)) { el.innerHTML = ''; el.style.display = 'none'; return; }
+
+  const { symbolicated, missing } = dsymImageSummary();
+  const uploaded = DSYM.list();
+  const versionTag = v => (v ? ` <span class="dsym-status-version">v${escapeHtml(v)}</span>` : '');
+  const imageLabel = (i, version) => `<span class="dsym-status-image">${escapeHtml(i.binary)}</span>${versionTag(version)} <span class="dsym-status-uuid">${escapeHtml(i.uuid || '')}</span>`;
+  const neededVersion = crashAppVersion();
+  const rows = [];
+  if (missing.length) {
+    // same binary uploaded, but from another build — the most common reason a dSYM "doesn't work"
+    const otherBuilds = missing.flatMap(i => uploaded.filter(u => u.name === i.binary && u.uuid !== i.uuid));
+    rows.push(`
+      <div class="dsym-status-row is-missing">
+        <span class="dsym-status-icon">⚠</span>
+        <span class="dsym-status-text">
+          Missing dSYM${missing.length > 1 ? 's' : ''}${neededVersion ? ` for app version <strong>${escapeHtml(neededVersion)}</strong>` : ''} — upload to symbolicate: ${missing.map(i => imageLabel(i)).join(', ')}
+          ${otherBuilds.length ? `<span class="dsym-status-hint">Uploaded ${otherBuilds.map(u => `${escapeHtml(u.name)}${versionTag(formatAppVersion(u.appVersion, u.buildVersion))} (${escapeHtml(u.uuid)})`).join(', ')} ${otherBuilds.length > 1 ? 'are' : 'is'} from a different build — the UUID must match.</span>` : ''}
+        </span>
+        <button class="btn btn-ghost dsym-status-btn" onclick="openDsymModal()">Upload dSYM</button>
+      </div>
+    `);
+  }
+  if (symbolicated.length) {
+    const dsymVersion = i => { const u = uploaded.find(x => x.uuid === i.uuid); return u ? formatAppVersion(u.appVersion, u.buildVersion) : ''; };
+    rows.push(`
+      <div class="dsym-status-row is-ok">
+        <span class="dsym-status-icon">✓</span>
+        <span class="dsym-status-text">Symbolicated with uploaded dSYM: ${symbolicated.map(i => imageLabel(i, dsymVersion(i))).join(', ')}</span>
+      </div>
+    `);
+  }
+  el.innerHTML = rows.join('');
+  el.style.display = rows.length ? '' : 'none';
+}
+
+function updateDsymCount() {
+  const el = document.getElementById('dsymCount');
+  if (!el || typeof DSYM === 'undefined') return;
+  const n = DSYM.list().length;
+  el.textContent = n ? String(n) : '';
+  el.style.display = n ? '' : 'none';
+}
+
+// re-run everything that shows frames — called after a dSYM is added/removed
+function refreshSymbolication() {
+  updateDsymCount();
+  renderDsymList();
+  if (stackTraceData || crashEvent || crashMetadata) renderStackTrace();
+}
+
+function openDsymModal() {
+  renderDsymList();
+  document.getElementById('dsymModal').style.display = 'flex';
+}
+
+function closeDsymModal() {
+  document.getElementById('dsymModal').style.display = 'none';
+}
+
+function formatUploadDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return `${d.getDate()} ${SHORT_MONTHS[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function renderDsymList() {
+  const el = document.getElementById('dsymList');
+  if (!el || typeof DSYM === 'undefined') return;
+  const images = DSYM.list();
+  if (!images.length) {
+    el.innerHTML = `<div class="dsym-empty">No dSYMs uploaded yet</div>`;
+    return;
+  }
+  const inUse = new Set(allFrames().map(f => DSYM.normalizeUUID(f.bId)).filter(Boolean));
+  el.innerHTML = `
+    <table class="dsym-table">
+      <thead><tr><th>Binary</th><th>Version</th><th>UUID</th><th>Arch</th><th>Uploaded</th><th></th></tr></thead>
+      <tbody>
+        ${images.map(img => `
+          <tr>
+            <td class="dsym-binary">
+              ${escapeHtml(img.name)}
+              ${inUse.has(img.uuid) ? '<span class="dsym-inuse">Used by this crash</span>' : ''}
+              ${img.hasDwarf ? '' : '<span class="dsym-nodwarf" title="This file has a symbol table but no DWARF debug info, so frames get function names without file:line">No debug info</span>'}
+            </td>
+            <td class="dsym-version">${escapeHtml(formatAppVersion(img.appVersion, img.buildVersion) || '—')}</td>
+            <td class="dsym-uuid">${escapeHtml(img.uuid)}</td>
+            <td>${escapeHtml(img.arch)}</td>
+            <td class="dsym-date">${escapeHtml(formatUploadDate(img.uploadedAt))}</td>
+            <td><button class="dsym-remove" onclick="removeDsym('${escapeHtml(img.uuid)}')" title="Remove dSYM" aria-label="Remove dSYM for ${escapeHtml(img.name)}">✕</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function removeDsym(uuid) {
+  await DSYM.remove(uuid);
+  refreshSymbolication();
+}
+
+function setDsymProgress(text, kind) {
+  const el = document.getElementById('dsymProgress');
+  el.textContent = text || '';
+  el.className = `dsym-progress${kind ? ` is-${kind}` : ''}`;
+}
+
+// only the DWARF binary inside a bundle matters — skip reading Info.plist,
+// relocation yml, swiftinterface files and the like from folder uploads
+// (the bundle's own Contents/Info.plist is kept — it holds the dSYM's app version/build)
+function isDsymCandidate(path) {
+  if (/(^|\/)Contents\/Info\.plist$/.test(path)) return true;
+  return !/\.(plist|yml|yaml|swiftinterface|swiftmodule|json|txt|md)$/i.test(path) && !/(^|\/)\.DS_Store$/.test(path);
+}
+
+async function ingestDsymFiles(entries) {
+  const files = entries.filter(e => isDsymCandidate(e.path));
+  if (!files.length) { setDsymProgress('No dSYM files found in that selection.', 'error'); return; }
+
+  setDsymProgress('Reading files…');
+  try {
+    const loaded = [];
+    for (const { file, path } of files) loaded.push({ name: path, bytes: new Uint8Array(await file.arrayBuffer()) });
+    const results = await DSYM.ingest(loaded, msg => setDsymProgress(msg));
+    const ok = results.filter(r => r.ok);
+    const failed = results.filter(r => !r.ok);
+    if (!results.length) {
+      setDsymProgress('No DWARF binary found — choose the .dSYM bundle, a .zip of it, or Contents/Resources/DWARF/<binary>.', 'error');
+    } else if (failed.length) {
+      setDsymProgress(`Added ${ok.length}, failed ${failed.length}: ${failed.map(f => `${f.name} (${f.error})`).join('; ')}`, 'error');
+    } else {
+      setDsymProgress(`Added ${ok.map(r => {
+        const v = formatAppVersion(r.appVersion, r.buildVersion);
+        return `${r.name}${v ? ` v${v}` : ''} (${r.arch}) ${r.uuid}`;
+      }).join(', ')}`, 'ok');
+    }
+  } catch (e) {
+    setDsymProgress(`Could not read dSYM: ${e.message}`, 'error');
+  }
+  refreshSymbolication();
+}
+
+function handleDsymInput(input) {
+  const entries = Array.from(input.files || []).map(file => ({ file, path: file.webkitRelativePath || file.name }));
+  input.value = ''; // picking the same file again should still fire change
+  ingestDsymFiles(entries);
+}
+
+// a .dSYM is a folder on macOS — walk dropped directories via the entries API
+function readDroppedEntry(entry, prefix) {
+  return new Promise(resolve => {
+    if (entry.isFile) {
+      entry.file(file => resolve([{ file, path: prefix + file.name }]), () => resolve([]));
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const all = [];
+      const readBatch = () => reader.readEntries(async batch => {
+        if (!batch.length) {
+          const nested = await Promise.all(all.map(e => readDroppedEntry(e, `${prefix}${entry.name}/`)));
+          resolve(nested.flat());
+          return;
+        }
+        all.push(...batch);
+        readBatch();
+      }, () => resolve([]));
+      readBatch();
+    } else {
+      resolve([]);
+    }
+  });
+}
+
+async function handleDsymDrop(event) {
+  event.preventDefault();
+  document.getElementById('dsymDropZone').classList.remove('is-dragover');
+  const items = Array.from(event.dataTransfer.items || []);
+  const entries = items.map(i => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null)).filter(Boolean);
+  const files = entries.length
+    ? (await Promise.all(entries.map(e => readDroppedEntry(e, '')))).flat()
+    : Array.from(event.dataTransfer.files || []).map(file => ({ file, path: file.name }));
+  ingestDsymFiles(files);
+}
+
+function initDsymSupport() {
+  if (typeof DSYM === 'undefined') return;
+  const zone = document.getElementById('dsymDropZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('is-dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('is-dragover'));
+  zone.addEventListener('drop', handleDsymDrop);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('dsymModal').style.display !== 'none') closeDsymModal();
+  });
+  DSYM.loadAll().then(refreshSymbolication);
 }
 
 // ── Filter Application ────────────────────────────────────────────────────────
@@ -1122,6 +1478,7 @@ function clearAll() {
   document.getElementById('crashLogWrap').style.display = 'none';
   document.getElementById('threadsList').innerHTML = '';
   document.getElementById('threadCount').textContent = '';
+  document.getElementById('dsymStatus').style.display = 'none';
   allBreadcrumbs = [];
   crashEvent     = null;
   stackTraceData = null;
@@ -1208,6 +1565,9 @@ function loadExampleByType(type) {
 
 // show the crash example on first load so the format is visible with no payload of your own
 loadExampleByType('ios-crash');
+
+// previously uploaded dSYMs come back from IndexedDB, then the example re-renders symbolicated if one matches
+initDsymSupport();
 
 // filter toolbar defaults — today's date instead of a blank picker
 document.getElementById('filterDate').valueAsDate = new Date();

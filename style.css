@@ -776,11 +776,17 @@ textarea::placeholder { color: var(--text-muted); }
 
 /* fixed-length values (counts, durations, N/A) — shrink the column to its
    content instead of sharing the same width budget as the text-heavy columns */
-.crash-log-table th.crash-log-compact,
 .crash-log-table td.crash-log-compact {
   width: 1%;
   white-space: nowrap;
   max-width: none;
+}
+
+/* header text wraps to two lines instead of forcing the column wide enough
+   to fit "Number of Errors" etc. on one line — the value cell stays narrow */
+.crash-log-table th.crash-log-compact {
+  white-space: normal;
+  max-width: 90px;
 }
 
 .crash-log-view-link {
@@ -1058,3 +1064,215 @@ textarea::placeholder { color: var(--text-muted); }
   .layout  { padding: 20px 16px; }
   header   { padding: 20px 16px; }
 }
+
+/* ── dSYM SYMBOLICATION ── */
+.dsym-header-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.platform-badge.visible + .dsym-header-btn { margin-left: 0; }
+
+.dsym-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+}
+
+/* symbolicated frame: function name, then file:line */
+.frame-symbolicated {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+}
+.frame-func { color: var(--text); }
+.frame-loc {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.frame-row-inlined { padding-top: 0; padding-bottom: 0; opacity: 0.8; }
+.frame-inlined-tag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+
+.dsym-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.dsym-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 12.5px;
+}
+.dsym-status-row.is-missing {
+  background: var(--c-user-bg);
+  border-color: var(--c-user-border);
+  color: var(--text);
+}
+.dsym-status-row.is-ok {
+  background: var(--c-network-bg);
+  border-color: var(--c-network-border);
+  color: var(--text);
+}
+.dsym-status-icon { font-weight: 700; flex-shrink: 0; }
+.dsym-status-row.is-missing .dsym-status-icon { color: var(--c-user); }
+.dsym-status-row.is-ok .dsym-status-icon { color: var(--c-network); }
+.dsym-status-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dsym-status-image { font-weight: 700; }
+.dsym-status-uuid {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.dsym-status-btn { padding: 5px 12px; font-size: 12px; flex-shrink: 0; }
+
+/* dSYM modal */
+.dsym-modal-box {
+  max-width: 820px;
+  min-height: 0;
+  background: var(--surface);
+}
+.dsym-modal-header { grid-template-columns: 1fr auto; }
+
+.dsym-intro {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.dsym-dropzone {
+  border: 1.5px dashed var(--border2);
+  border-radius: 10px;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  background: var(--bg);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.dsym-dropzone.is-dragover {
+  border-color: var(--accent);
+  background: var(--c-nav-bg);
+}
+.dsym-dropzone-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.dsym-dropzone-title code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
+.dsym-dropzone-hint { font-size: 12px; color: var(--text-muted); }
+.dsym-dropzone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.dsym-dropzone-actions label { display: inline-flex; align-items: center; }
+
+.dsym-progress {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.dsym-progress:empty { display: none; }
+.dsym-progress.is-ok { color: var(--c-network); }
+.dsym-progress.is-error { color: var(--c-error); }
+
+.dsym-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+#dsymList { overflow-x: auto; }
+
+.dsym-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.dsym-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.dsym-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  vertical-align: middle;
+}
+.dsym-binary { color: var(--text); font-weight: 600; }
+.dsym-uuid, .dsym-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: nowrap; }
+
+.dsym-inuse, .dsym-nodwarf {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.dsym-inuse { background: var(--c-network-bg); color: var(--c-network); border: 1px solid var(--c-network-border); }
+.dsym-nodwarf { background: var(--c-user-bg); color: var(--c-user); border: 1px solid var(--c-user-border); }
+
+.dsym-remove {
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+}
+.dsym-remove:hover { color: var(--c-error); border-color: var(--c-error-border); }
+.dsym-remove:active { transform: scale(0.92); }
+
+@media (max-width: 640px) {
+  .dsym-status-row { flex-wrap: wrap; }
+}
+
+.dsym-status-version {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.dsym-status-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.dsym-version { font-family: 'JetBrains Mono', monospace; font-size: 11px; white-space: nowrap; color: var(--text); }
