@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-09-24
+- Symbolicated frames are now one line per address, leading with the inlined function where the crash happened (e.g. "Swift runtime failure: …") and the function it was inlined into in brackets; a crash missing its dSYM now shows only the missing-dSYM warning.
 - The dSYM dialog has a separate Upload Apple symbols button (loads only the system libraries a crash uses) and lists them in their own collapsed section; the Threads banner now shows only your app's dSYMs and always keeps an Upload dSYM button.
 - iOS system libraries (UIKitCore, SwiftUI, CoreFoundation, …) copied from Xcode's iOS DeviceSupport folder can now be uploaded like dSYMs and resolve frames the same way atos does — stripped functions stay unnamed and linker-merged ones show as <deduplicated_symbol> instead of a wrong name.
 - Symbolication now detects stacks sent outermost-first (dyld start at frame 0) so the real crash frame is resolved precisely, dSYM uploads show results without waiting on browser storage, and crash log column headers wrap instead of widening the table.
